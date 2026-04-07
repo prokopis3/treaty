@@ -13,6 +13,8 @@ Is Angular in perfect harmony in the Bun runtime using Elysia.js and Surrealdb
 - It's Zoneless together with SSR
 - Server running with bun
 - Tests running with bun
+- Tailwind CSS v4 configured through PostCSS
+- Vite dev server option that proxies API requests to Elysia
 
 ## Runtime note
 
@@ -24,6 +26,18 @@ Is Angular in perfect harmony in the Bun runtime using Elysia.js and Surrealdb
 - `bun i`
 - `bun run build`
 - `bun run server.ts`
+
+## Vite + Elysia dev
+
+- `bun run dev:vite`
+- Open `http://localhost:5173`
+- Elysia API continues to run on `http://localhost:4201`
+
+## Tailwind v4 usage
+
+- Tailwind is enabled globally in `src/styles.scss`
+- PostCSS plugin config is in `postcss.config.mjs`
+- Add utility classes directly in component templates
 
 ## Getting started watching
 

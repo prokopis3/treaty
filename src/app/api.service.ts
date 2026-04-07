@@ -6,5 +6,8 @@ import { edenClient } from '../libs/edenclient';
   providedIn: 'root',
 })
 export class ApiService {
-  client = edenClient<App>('http://localhost:4201').api;
+  private readonly apiBaseUrl =
+    typeof window === 'undefined' ? 'http://localhost:4201' : '';
+
+  client = edenClient<App>(this.apiBaseUrl).api;
 }

@@ -5,8 +5,16 @@
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build --configuration production",
+    "vite": "vite",
+    "vite:build": "vite build",
     "watch": "ng build --watch --configuration development",
-    "prod": "bun run build && bun run server"
+    "server": "bun run server.ts",
+    "server:watch": "bun --watch server.ts",
+    "dev": "concurrently \"npm run watch\" \"npm run server:watch\"",
+    "dev:vite": "concurrently \"bun run vite --host --port 5173 --strictPort --open\" \"bun run server:watch\"",
+    "precommit:verify": "bun run build && bun run vite:build",
+    "prod": "bun run build && bun run server",
+    "prepare": "husky"
   },
   "dependencies": {
     "@angular/animations": "^20.3.18",
@@ -30,12 +38,18 @@
     "tslib": "^2.3.0"
   },
   "devDependencies": {
+    "@analogjs/vite-plugin-angular": "^2.4.0",
     "@angular/build": "^20.3.22",
     "@angular/cli": "^20.3.22",
     "@angular/compiler-cli": "^20.3.18",
     "@happy-dom/global-registrator": "^13.3.8",
+    "@tailwindcss/postcss": "^4.2.2",
     "@types/bun": "^1.0.5",
-    "typescript": "^5.9.3"
+    "concurrently": "^9.2.1",
+    "husky": "^9.1.7",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.5"
   },
   "trustedDependencies": [
     "@parcel/watcher"

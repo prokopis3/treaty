@@ -3,49 +3,17 @@ import { HttpClient } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
   Component,
-  Input,
   inject,
   input,
 } from '@angular/core';
-import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRouteSnapshot } from '@angular/router';
-import { map } from 'rxjs';
-import { ApiService } from '../api.service';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
 const fb = new FormBuilder();
-export const resolvePost = {
-  post: (route: ActivatedRouteSnapshot) => {
-    const res = inject(ApiService)
-      .client.id[route.params['id']].get()
-      .pipe(
-        map((test) => {
-          console.log(' ');
-          console.log('Post resolver', test);
-          console.log(' ');
-
-          return test.data;
-        })
-      );
-
-    return res;
-  },
-  
-};
 
 @Component({
     selector: 'app-post',
-    standalone: true,
-    imports: [ReactiveFormsModule],
-    template: `
-    <h1>Post</h1>
-    {{ post() }}
-
-    <form [formGroup]="form" (submit)="submit()">
-      <input type="text" formControlName="strField" />
-      <input type="number" formControlName="numbField" />
-      <button type="submit">submit</button>
-    </form>
-  `,
+    imports: [ReactiveFormsModule, JsonPipe],
+    templateUrl: './post.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export default class PostComponent {
@@ -54,6 +22,11 @@ export default class PostComponent {
   post = input();
 
   title = 'treaty';
+
+  public testjson = {
+    strField: 'string value',
+    numbField: 12,
+  };
   form = fb.group({
     strField: fb.control('', Validators.required),
     numbField: fb.control<number | null>(null),
