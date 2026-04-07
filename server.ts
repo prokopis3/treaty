@@ -21,9 +21,15 @@ const serverDistFolder = import.meta.dirname;
 const browserDistFolder = join(serverDistFolder, 'dist/treaty/browser');
 const indexHtml = join(serverDistFolder, 'dist/treaty/browser/index.html');
 const commonEngine = new CommonEngine({
-  allowedHosts: ['localhost'],
+  allowedHosts: ['localhost', '127.0.0.1', 'gadgetify.io', 'origin.gadgetify.io', 'treaty.prokopis123.workers.dev'],
   enablePerformanceProfiler: true,
 });
+
+const VITE_DEV_ENTRY = '<script type="module" src="/main.ts"></script>';
+
+function toProductionHtml(html: string): string {
+  return html.replaceAll(VITE_DEV_ENTRY, '');
+}
 
 const app = new Elysia()
   .derive(({ request: { url } }) => {
@@ -49,6 +55,10 @@ const app = new Elysia()
   .get('*.*', async ({ originalUrl }) => {
     const file = Bun.file(`${browserDistFolder}${originalUrl}`);
 
+    if (!(await file.exists())) {
+      return new Response('Not Found', { status: 404 });
+    }
+
     return new Response(await file.arrayBuffer(), {
       headers: {
         'Content-Type': file.type,
@@ -58,6 +68,10 @@ const app = new Elysia()
   .get('*', async ({ originalUrl, baseUrl, protocol, headers }) => {
     if (originalUrl.includes('.')) {
       const file = Bun.file(`${browserDistFolder}${originalUrl}`);
+
+      if (!(await file.exists())) {
+        return new Response('Not Found', { status: 404 });
+      }
 
       return new Response(await file.arrayBuffer(), {
         headers: {
@@ -77,23 +91,28 @@ const app = new Elysia()
     }
 
     try {
-      console.log(`${protocol}://${headers['host']}${originalUrl}`);
+      const forwardedProto = headers['x-forwarded-proto'] || protocol;
+      const forwardedHost = headers['x-forwarded-host'] || headers['host'];
+
+      console.log(`${forwardedProto}://${forwardedHost}${originalUrl}`);
 
       const _html = await commonEngine.render({
         bootstrap,
         documentFilePath: indexHtml,
-        url: `${protocol}://${headers['host']}${originalUrl}`,
+        url: `${forwardedProto}://${forwardedHost}${originalUrl}`,
         publicPath: browserDistFolder,
         providers: [{ provide: APP_BASE_HREF, useValue: '' }],
       });
 
-      console.log(_html);
+      const productionHtml = toProductionHtml(_html);
+
+      console.log(productionHtml);
 
       await db.create(`url:\`${originalUrl}\``, {
-        content: _html,
+        content: productionHtml,
       });
 
-      return new Response(_html, {
+      return new Response(productionHtml, {
         headers: {
           'Content-Type': 'text/html',
         },

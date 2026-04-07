@@ -13,6 +13,11 @@
     "dev": "concurrently \"npm run watch\" \"npm run server:watch\"",
     "dev:vite": "concurrently \"bun run vite --host --port 5173 --strictPort --open\" \"bun run server:watch\"",
     "precommit:verify": "bun run build && bun run vite:build",
+    "cf:dev": "wrangler dev",
+    "cf:deploy": "wrangler deploy",
+    "docker:prod:up": "docker compose --env-file .env -f docker-compose.prod.yml up -d --build",
+    "docker:prod:down": "docker compose --env-file .env -f docker-compose.prod.yml down",
+    "deploy:option-a": "bun run docker:prod:up && bun run cf:deploy",
     "prod": "bun run build && bun run server",
     "prepare": "husky"
   },
@@ -49,7 +54,8 @@
     "husky": "^9.1.7",
     "tailwindcss": "^4.2.2",
     "typescript": "^5.9.3",
-    "vite": "^8.0.5"
+    "vite": "^8.0.5",
+    "wrangler": "^4.80.0"
   },
   "trustedDependencies": [
     "@parcel/watcher"

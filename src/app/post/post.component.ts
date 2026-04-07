@@ -13,7 +13,17 @@ const fb = new FormBuilder();
 @Component({
     selector: 'app-post',
     imports: [ReactiveFormsModule, JsonPipe],
-    templateUrl: './post.component.html',
+    template: `
+    <h1>Post</h1>
+    {{ post() }}
+
+    <form [formGroup]="form" (submit)="submit()">
+      <input type="text" formControlName="strField" placeholder="String Field" />
+      <input type="number" formControlName="numbField" placeholder="Number Field" />
+      <button type="submit">submit</button>
+      <p>{{ testjson | json }}</p>
+    </form>
+  `,
     changeDetection: ChangeDetectionStrategy.OnPush
 })
 export default class PostComponent {

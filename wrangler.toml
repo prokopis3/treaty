@@ -1,0 +1,9 @@
+name = "treaty"
+main = "cloudflare/worker.ts"
+compatibility_date = "2026-04-07"
+workers_dev = true
+
+[vars]
+# IMPORTANT: must be your cloudflared public origin host, NOT this worker URL.
+# Example: https://origin.yourdomain.com
+ORIGIN_URL = "https://origin.gadgetify.io"
