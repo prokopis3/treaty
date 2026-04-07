@@ -8,7 +8,7 @@ import { join } from 'path';
 import { Surreal } from 'surrealdb.node';
 
 import { APP_BASE_HREF } from '@angular/common';
-import { CommonEngine } from '@angular/ssr';
+import { CommonEngine } from '@angular/ssr/node';
 import bootstrap from './src/main.server';
 
 const db = new Surreal();

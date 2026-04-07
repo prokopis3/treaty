@@ -33,10 +33,10 @@ export const resolvePost = {
 };
 
 @Component({
-  selector: 'app-post',
-  standalone: true,
-  imports: [JsonPipe, ReactiveFormsModule],
-  template: `
+    selector: 'app-post',
+    standalone: true,
+    imports: [ReactiveFormsModule],
+    template: `
     <h1>Post</h1>
     {{ post() }}
 
@@ -46,7 +46,7 @@ export const resolvePost = {
       <button type="submit">submit</button>
     </form>
   `,
-  changeDetection: ChangeDetectionStrategy.OnPush,
+    changeDetection: ChangeDetectionStrategy.OnPush
 })
 export default class PostComponent {
   private api = inject(HttpClient);
