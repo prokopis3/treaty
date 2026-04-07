@@ -7,7 +7,7 @@ import {
   inject,
   input,
 } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRouteSnapshot } from '@angular/router';
 import { map } from 'rxjs';
 import { ApiService } from '../api.service';

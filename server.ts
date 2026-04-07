@@ -21,6 +21,7 @@ const serverDistFolder = import.meta.dirname;
 const browserDistFolder = join(serverDistFolder, 'dist/treaty/browser');
 const indexHtml = join(serverDistFolder, 'dist/treaty/browser/index.html');
 const commonEngine = new CommonEngine({
+  allowedHosts: ['localhost'],
   enablePerformanceProfiler: true,
 });
 
@@ -109,4 +110,5 @@ console.log(
   `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`
 );
 
+export const reqHandler = app.handle
 export type App = typeof app;
