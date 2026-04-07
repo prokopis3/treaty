@@ -14,6 +14,11 @@ Is Angular in perfect harmony in the Bun runtime using Elysia.js and Surrealdb
 - Server running with bun
 - Tests running with bun
 
+## Runtime note
+
+- This repo intentionally keeps zoneless SSR without client hydration.
+- Enabling `provideClientHydration(...)` together with the custom/noop Zone shim leads to Angular hydration warning/error `NG05000` in current versions.
+
 ## Getting started
 
 - `bun i`

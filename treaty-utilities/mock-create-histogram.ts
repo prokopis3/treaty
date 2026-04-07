@@ -13,6 +13,9 @@ function _customCreateHistogram(options: any) {
 // Override the createHistogram function
 originalPerfHooks.createHistogram = _customCreateHistogram;
 
-// Replace the module in the require cache
-// @ts-ignore
-(require as NodeRequire).cache['perf_hooks'].exports = originalPerfHooks;
+// Older Bun builds exposed built-ins through require.cache, but newer builds may not.
+const requireCache = (require as NodeJS.Require & { cache?: Record<string, { exports: unknown }> }).cache;
+
+if (requireCache?.['perf_hooks']) {
+  requireCache['perf_hooks'].exports = originalPerfHooks;
+}

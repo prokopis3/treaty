@@ -48,7 +48,7 @@ const app = new Elysia()
   .get('*.*', async ({ originalUrl }) => {
     const file = Bun.file(`${browserDistFolder}${originalUrl}`);
 
-    return new Response(Buffer.from(await file.arrayBuffer()), {
+    return new Response(await file.arrayBuffer(), {
       headers: {
         'Content-Type': file.type,
       },
@@ -58,7 +58,7 @@ const app = new Elysia()
     if (originalUrl.includes('.')) {
       const file = Bun.file(`${browserDistFolder}${originalUrl}`);
 
-      return new Response(Buffer.from(await file.arrayBuffer()), {
+      return new Response(await file.arrayBuffer(), {
         headers: {
           'Content-Type': file.type,
         },

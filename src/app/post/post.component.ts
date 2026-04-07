@@ -29,21 +29,7 @@ export const resolvePost = {
 
     return res;
   },
-  postOldInput: (route: ActivatedRouteSnapshot) => {
-    const res = inject(ApiService)
-      .client.id[route.params['id']].get()
-      .pipe(
-        map((test) => {
-          console.log(' ');
-          console.log('Post resolver', test);
-          console.log(' ');
-
-          return test.data;
-        })
-      );
-
-    return res;
-  },
+  
 };
 
 @Component({
@@ -52,7 +38,6 @@ export const resolvePost = {
   imports: [JsonPipe, ReactiveFormsModule],
   template: `
     <h1>Post</h1>
-    {{ postOldInput }}
     {{ post() }}
 
     <form [formGroup]="form" (submit)="submit()">
@@ -67,7 +52,6 @@ export default class PostComponent {
   private api = inject(HttpClient);
 
   post = input();
-  @Input('postOldInput') postOldInput!: string;
 
   title = 'treaty';
   form = fb.group({
