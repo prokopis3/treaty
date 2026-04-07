@@ -4,8 +4,11 @@ import { resolvePost } from './post/post.resolver';
 export const routes: Routes = [
   {
     path: '',
-    redirectTo: 'post/1',
-    pathMatch: 'full',
+    loadComponent: () => import('./landing/landing.component'),
+  },
+  {
+    path: 'posts',
+    loadComponent: () => import('./posts/posts.component'),
   },
   {
     path: 'post/:id',

@@ -2,19 +2,18 @@ import { ActivatedRouteSnapshot } from '@angular/router';
 import { inject } from '@angular/core';
 import { map } from 'rxjs';
 import { ApiService } from '../api.service';
+import { PostModel } from './post.model';
 
 export const resolvePost = {
   post: (route: ActivatedRouteSnapshot) =>
     inject(ApiService)
-      .client.id[route.params['id']]
+      .client.posts[route.params['id']]
       .get()
       .pipe(
-        map((test) => {
-          console.log(' ');
-          console.log('Post resolver', test);
-          console.log(' ');
+        map((response) => {
+          const body = response as unknown as { data?: PostModel | null };
 
-          return test.data;
+          return body.data ?? null;
         })
       ),
 };

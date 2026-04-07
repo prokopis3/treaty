@@ -42,13 +42,12 @@
             "outputPath": "dist/treaty",
             "index": "src/index.html",
             "browser": "src/main.ts",
-            "externalDependencies": ["surrealdb.node"],
             "prerender": false,
             "polyfills": [],
             "tsConfig": "tsconfig.app.json",
             "inlineStyleLanguage": "scss",
             "assets": ["src/favicon.ico", "src/assets"],
-            "styles": ["src/styles.scss"],
+            "styles": ["src/tailwind.generated.css"],
             "scripts": []
           },
           "configurations": {

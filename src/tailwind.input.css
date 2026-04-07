@@ -1,0 +1,17 @@
+@import "tailwindcss";
+@source "./**/*.{html,ts,css,scss}";
+
+html,
+body {
+  min-height: 100%;
+  background: oklch(12.9% 0.042 264.695);
+}
+
+body {
+  margin: 0;
+}
+
+app-root {
+  display: block;
+  min-height: 100vh;
+}

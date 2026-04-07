@@ -5,15 +5,24 @@ import './treaty-utilities/mock-zone';
 import { Elysia, t } from 'elysia';
 import { join } from 'path';
 
-import { Surreal } from 'surrealdb.node';
-
 import { APP_BASE_HREF } from '@angular/common';
 import { CommonEngine } from '@angular/ssr/node';
 import bootstrap from './src/main.server';
+import { PostService } from './backend/application/post.service';
+import { seedPosts } from './backend/application/post.seed';
+import { createSurrealClient } from './backend/infrastructure/surreal/surreal.client';
+import { SurrealPageCacheRepository } from './backend/infrastructure/surreal/surreal-page-cache.repository';
+import { SurrealPostRepository } from './backend/infrastructure/surreal/surreal-post.repository';
+import { ensureSurrealSchema } from './backend/infrastructure/surreal/surreal.schema';
+import { createAuthContext } from './backend/presentation/api/auth-context';
 
-const db = new Surreal();
-await db.connect('memory');
-await db.use({ ns: 'test', db: 'test' });
+const db = await createSurrealClient();
+await ensureSurrealSchema(db);
+const postRepository = new SurrealPostRepository(db);
+const postService = new PostService(postRepository);
+const pageCacheRepository = new SurrealPageCacheRepository(db);
+
+await seedPosts(postRepository);
 
 const port = process.env['PORT'] || 4201;
 const serverDistFolder = import.meta.dirname;
@@ -28,10 +37,17 @@ const commonEngine = new CommonEngine({
 const VITE_DEV_ENTRY = '<script type="module" src="/main.ts"></script>';
 
 function toProductionHtml(html: string): string {
-  return html.replaceAll(VITE_DEV_ENTRY, '');
+  return html
+    .replaceAll(VITE_DEV_ENTRY, '')
+    .replace(/href="(styles-[^"]+\.css)"/g, 'href="/$1"')
+    .replace(/href="(favicon\.ico)"/g, 'href="/$1"')
+    .replace(/href="(chunk-[^"]+\.js)"/g, 'href="/$1"')
+    .replace(/src="(main-[^"]+\.js)"/g, 'src="/$1"')
+    .replace(/href="(main-[^"]+\.js)"/g, 'href="/$1"')
+    .replace(/href="(chunk-[^"]+\.css)"/g, 'href="/$1"');
 }
 
-const app = new Elysia()
+let app = new Elysia()
   .derive(({ request: { url } }) => {
     const _url = new URL(url);
 
@@ -43,8 +59,50 @@ const app = new Elysia()
   })
   .group('/api', (api) => {
     return api
+      .get('/posts', async () => {
+        const result = await postService.listWithMeta();
+
+        return {
+          data: result.data,
+          meta: result.meta,
+        };
+      })
+      .get(
+        '/posts/:id',
+        async ({ params: { id }, set }) => {
+          const post = await postService.getById(id);
+
+          if (!post) {
+            set.status = 404;
+            return { data: null };
+          }
+
+          return { data: post };
+        },
+        {
+          params: t.Object({
+            id: t.String(),
+          }),
+        }
+      )
+      .post(
+        '/posts',
+        async ({ body, headers }) => {
+          const auth = createAuthContext(headers);
+          const created = await postService.create(body, auth);
+
+          return { data: created };
+        },
+        {
+          body: t.Object({
+            title: t.String({ minLength: 3 }),
+            content: t.String({ minLength: 10 }),
+            source: t.Optional(t.String()),
+          }),
+        }
+      )
       .get('/id/:id', ({ params: { id } }) => ({ data: `Post with id: ${id}` }))
-      .get('/example', () => `just an example`)
+      .get('/example', () => 'just an example')
       .post('/form', ({ body }) => body, {
         body: t.Object({
           strField: t.String(),
@@ -80,7 +138,7 @@ const app = new Elysia()
       });
     }
 
-    const cacheHit = await db.select(`url:\`${originalUrl}\``);
+    const cacheHit = await pageCacheRepository.getByUrl(originalUrl);
 
     if (cacheHit) {
       return new Response(cacheHit.content, {
@@ -108,9 +166,7 @@ const app = new Elysia()
 
       console.log(productionHtml);
 
-      await db.create(`url:\`${originalUrl}\``, {
-        content: productionHtml,
-      });
+      await pageCacheRepository.upsertByUrl(originalUrl, productionHtml);
 
       return new Response(productionHtml, {
         headers: {
@@ -122,8 +178,9 @@ const app = new Elysia()
 
       return 'Missing page';
     }
-  })
-  .listen(port);
+  });
+
+app.listen(port);
 
 console.log(
   `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`
