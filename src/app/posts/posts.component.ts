@@ -1,7 +1,7 @@
 import { AsyncPipe, DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { map } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { ApiService } from '../api.service';
 import { PostModel } from '../post/post.model';
 
@@ -53,11 +53,15 @@ import { PostModel } from '../post/post.model';
 export default class PostsComponent {
   private readonly apiService = inject(ApiService);
 
-  protected readonly posts$ = this.apiService.client.posts.get().pipe(
+  protected readonly posts$: Observable<PostModel[]> = this.apiService.client.posts.get().pipe(
     map((response) => {
-      const body = response as unknown as { data?: PostModel[] };
+      const body = response as unknown as { data?: { data?: PostModel[] } | PostModel[] };
 
-      return body.data ?? [];
+      if (Array.isArray(body.data)) {
+        return body.data;
+      }
+
+      return body.data?.data ?? [];
     })
   );
 }

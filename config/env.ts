@@ -32,7 +32,7 @@ const getEnv = () => {
     PORT: parseInt(process.env['PORT'] || '4201', 10),
     APP_LOG_LEVEL: process.env['APP_LOG_LEVEL'] || '',
     APP_DEBUG_LOGS: process.env['APP_DEBUG_LOGS'] || 'false',
-    NO_COLOR: process.env['NO_COLOR'] || '',
+    NO_COLOR: Boolean(process.env['NO_COLOR']) || false,
     CORS_ORIGIN: process.env['CORS_ORIGIN'] || '',
     CORS_CREDENTIALS: process.env['CORS_CREDENTIALS'] || 'false',
     SURREAL_ENDPOINT: process.env['SURREAL_ENDPOINT'] || '',

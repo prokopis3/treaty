@@ -118,7 +118,7 @@ export default class PostComponent {
 
     this.apiService.client.posts
       .post(payload)
-      .subscribe((response) => {
+      .subscribe((response: any) => {
         const body = response as unknown as { data?: PostModel };
 
         this.createdPost.set(body.data ?? null);

@@ -115,7 +115,7 @@ const createProxy = (
     });
 };
 
-export const edenClient = <App extends Elysia<any, any, any, any, any, any>>(
+export const edenClient = <App extends Elysia<any, any, any, any, any, any, any>>(
     domain: string,
 ): EdenClient.Create<App> => {
     assertInInjectionContext(() => `edenClient can only be called inside of the constuctor context`)

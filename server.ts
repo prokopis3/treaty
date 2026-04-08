@@ -4,8 +4,9 @@ import './treaty-utilities/mock-zone';
 
 import { Elysia } from 'elysia';
 import { cors } from '@elysiajs/cors';
-import { opentelemetry } from '@elysiajs/opentelemetry';
 import { serverTiming } from '@elysiajs/server-timing';
+import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-node';
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto';
 import { join } from 'path';
 import { env } from './config/env';
 
@@ -62,16 +63,26 @@ const corsConfig = getCorsConfig();
 const postsApi = createPostsApi(postService);
 const isDevelopment = env.NODE_ENV !== 'production';
 
-const withDevelopmentTelemetry = <T extends AnyElysia>(instance: T): T => {
+const withDevelopmentTelemetry = async <T extends AnyElysia>(instance: T): Promise<T> => {
   if (!isDevelopment) {
     return instance;
   }
 
-  return instance.use(
-    opentelemetry({
-      serviceName: 'treaty-server',
-    })
-  ) as T;
+  try {
+    const { opentelemetry } = await import('@elysiajs/opentelemetry');
+
+    return instance.use(
+      opentelemetry({
+        serviceName: 'treaty-server',
+        spanProcessors: [
+          new BatchSpanProcessor(new OTLPTraceExporter()),
+        ],
+      })
+    ) as T;
+  } catch (error) {
+    logger.warn('OpenTelemetry plugin is disabled due to runtime incompatibility', error);
+    return instance;
+  }
 };
 
 function toProductionHtml(html: string): string {
@@ -85,7 +96,7 @@ function toProductionHtml(html: string): string {
     .replace(/href="(chunk-[^"]+\.css)"/g, 'href="/$1"');
 }
 
-const app = withDevelopmentTelemetry(
+const app = (await withDevelopmentTelemetry(
   new Elysia()
     .use(cors(corsConfig))
     .use(
@@ -101,7 +112,7 @@ const app = withDevelopmentTelemetry(
         },
       })
     )
-).derive(({ request: { url } }) => {
+)).derive(({ request: { url } }) => {
     const _url = new URL(url);
 
     return {
