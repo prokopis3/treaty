@@ -12,18 +12,20 @@
     "vite": "vite",
     "vite:build": "vite build",
     "watch": "concurrently \"bun run tw:watch\" \"ng build --watch --configuration development\"",
-    "server": "bun run server.ts",
+    "server": "bun --watch server.ts",
     "server:watch": "bun --watch server.ts",
     "dev": "concurrently \"npm run watch\" \"npm run server:watch\"",
     "dev:vite": "concurrently \"bun run tw:watch\" \"bun run vite --host --port 5173 --strictPort --open\" \"bun run server:watch\"",
+    "build:server": "bun build --target=bun --packages=external --outfile=server.bundle.js server.ts",
     "precommit:verify": "bun run build && bun run vite:build",
+    "prepare": "husky",
+    "pre-commit": "bun run precommit:verify",
     "cf:dev": "wrangler dev",
     "cf:deploy": "wrangler deploy",
     "docker:prod:up": "docker compose --env-file .env -f docker-compose.prod.yml up -d --build",
     "docker:prod:down": "docker compose --env-file .env -f docker-compose.prod.yml down",
     "deploy:option-a": "bun run docker:prod:up && bun run cf:deploy",
-    "prod": "bun run build && bun run server",
-    "prepare": "husky"
+    "prod": "bun run build && bun run server"
   },
   "dependencies": {
     "@angular/animations": "^20.3.18",

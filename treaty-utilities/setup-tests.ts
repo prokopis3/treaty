@@ -3,7 +3,7 @@ import { afterEach, beforeEach } from 'bun:test';
 
 GlobalRegistrator.register();
 
-import { ɵprovideZonelessChangeDetection } from '@angular/core';
+import { provideZonelessChangeDetection } from '@angular/core';
 import { getTestBed } from '@angular/core/testing';
 import {
   BrowserDynamicTestingModule,
@@ -19,7 +19,7 @@ testBed.initTestEnvironment(
 
 beforeEach(() => {
   testBed.configureTestingModule({
-    providers: [ɵprovideZonelessChangeDetection()],
+    providers: [provideZonelessChangeDetection()],
   });
 });
 

@@ -47,3 +47,4 @@ Thumbs.db
 .env.production
 .wrangler/
 src/tailwind.generated.css
+server.bundle.js
