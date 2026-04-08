@@ -60,6 +60,10 @@ const createProxy = (
     path = '',
     httpClient: HttpClient
 ): Record<string, any> => {
+    const shouldLogClientErrors =
+        typeof window !== 'undefined'
+        && ['localhost', '127.0.0.1'].includes(window.location.hostname)
+
     return new Proxy(() => { }, {
         get(_, key: string) {
             return createProxy(domain, `${path}/${key}`, httpClient);
@@ -85,7 +89,13 @@ const createProxy = (
             };
 
             const errorHandler = catchError((error: HttpErrorResponse) => {
-                console.log('JORDAN-----' + error.message)
+                if (shouldLogClientErrors) {
+                    console.error('[edenclient] request failed', {
+                        status: error.status,
+                        message: error.message,
+                    })
+                }
+
                 return of(new EdenFetchError(error.status, error.message))
             })
 

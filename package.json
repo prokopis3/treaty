@@ -42,6 +42,7 @@
     "@elysiajs/cors": "^1.4.1",
     "@elysiajs/eden": "^0.8.1",
     "@elysiajs/static": "^1.4.7",
+    "consola": "^3.4.2",
     "elysia": "^0.8.16",
     "ngxtension": "^2.0.0",
     "rxjs": "~7.8.0",

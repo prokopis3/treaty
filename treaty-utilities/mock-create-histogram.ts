@@ -5,7 +5,7 @@ function _customCreateHistogram(options: any) {
   // Implement your polyfill logic here
   return {
     // Mock or polyfill methods as needed
-    record: (value: any) => console.log(`Recorded value: ${value}`),
+    record: (_value: any) => {},
     // Other necessary methods...
   };
 }

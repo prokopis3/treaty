@@ -53,7 +53,9 @@ FROM oven/bun:1.3.11 AS runtime
 WORKDIR /app
 
 ENV NODE_ENV=production \
-    PORT=4201
+    PORT=4201 \
+    APP_LOG_LEVEL=info \
+    APP_DEBUG_LOGS=false
 
 # Production node_modules only (~60 MB vs ~500 MB with devDeps)
 # Contains: @angular/*, elysia, rxjs, surrealdb, @dotenvx/dotenvx, etc.

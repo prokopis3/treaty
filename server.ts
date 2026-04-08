@@ -3,6 +3,7 @@ import './treaty-utilities/mock-create-histogram';
 import './treaty-utilities/mock-zone';
 
 import { Elysia, t } from 'elysia';
+import { cors } from '@elysiajs/cors';
 import { join } from 'path';
 
 import { APP_BASE_HREF } from '@angular/common';
@@ -15,6 +16,8 @@ import { SurrealPageCacheRepository } from './backend/infrastructure/surreal/sur
 import { SurrealPostRepository } from './backend/infrastructure/surreal/surreal-post.repository';
 import { ensureSurrealSchema } from './backend/infrastructure/surreal/surreal.schema';
 import { createAuthContext } from './backend/presentation/api/auth-context';
+import { scopedLogger } from './backend/infrastructure/logging/logger';
+import { getCorsConfig } from './backend/infrastructure/http/cors.config';
 
 const db = await createSurrealClient();
 await ensureSurrealSchema(db);
@@ -35,6 +38,8 @@ const commonEngine = new CommonEngine({
 });
 
 const VITE_DEV_ENTRY = '<script type="module" src="/main.ts"></script>';
+const logger = scopedLogger('server');
+const corsConfig = getCorsConfig();
 
 function toProductionHtml(html: string): string {
   return html
@@ -48,6 +53,7 @@ function toProductionHtml(html: string): string {
 }
 
 let app = new Elysia()
+  .use(cors(corsConfig))
   .derive(({ request: { url } }) => {
     const _url = new URL(url);
 
@@ -152,7 +158,7 @@ let app = new Elysia()
       const forwardedProto = headers['x-forwarded-proto'] || protocol;
       const forwardedHost = headers['x-forwarded-host'] || headers['host'];
 
-      console.log(`${forwardedProto}://${forwardedHost}${originalUrl}`);
+      logger.debug(`SSR render requested for ${forwardedProto}://${forwardedHost}${originalUrl}`);
 
       const _html = await commonEngine.render({
         bootstrap,
@@ -164,7 +170,7 @@ let app = new Elysia()
 
       const productionHtml = toProductionHtml(_html);
 
-      console.log(productionHtml);
+      logger.debug(`SSR render complete for ${originalUrl} (html length: ${productionHtml.length})`);
 
       await pageCacheRepository.upsertByUrl(originalUrl, productionHtml);
 
@@ -174,7 +180,7 @@ let app = new Elysia()
         },
       });
     } catch (error) {
-      console.log(error);
+      logger.error(`SSR render failed for ${originalUrl}`, error);
 
       return 'Missing page';
     }
@@ -182,9 +188,7 @@ let app = new Elysia()
 
 app.listen(port);
 
-console.log(
-  `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`
-);
+logger.success(`Elysia is running at ${app.server?.hostname}:${app.server?.port}`);
 
 export const reqHandler = app.handle
 export type App = typeof app;
