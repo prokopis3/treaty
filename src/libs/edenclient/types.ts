@@ -32,7 +32,7 @@ type AnySchema = {
 };
 
 export namespace EdenClient {
-  export type Create<App extends Elysia<any, any, any, any, any, any>> =
+  export type Create<App extends Elysia<any, any, any, any, any, any, any>> =
     App extends {
       schema: infer Schema extends Record<string, any>;
     }
