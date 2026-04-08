@@ -41,6 +41,8 @@
     "@dotenvx/dotenvx": "^1.60.1",
     "@elysiajs/cors": "^1.4.1",
     "@elysiajs/eden": "^0.8.1",
+    "@elysiajs/opentelemetry": "^1.4.11",
+    "@elysiajs/server-timing": "^1.4.0",
     "@elysiajs/static": "^1.4.7",
     "consola": "^3.4.2",
     "elysia": "^0.8.16",

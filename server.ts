@@ -2,12 +2,15 @@ import '@angular/compiler';
 import './treaty-utilities/mock-create-histogram';
 import './treaty-utilities/mock-zone';
 
-import { Elysia, t } from 'elysia';
+import { Elysia } from 'elysia';
 import { cors } from '@elysiajs/cors';
+import { opentelemetry } from '@elysiajs/opentelemetry';
+import { serverTiming } from '@elysiajs/server-timing';
 import { join } from 'path';
+import { env } from './config/env';
 
 import { APP_BASE_HREF } from '@angular/common';
-import { CommonEngine } from '@angular/ssr/node';
+import { CommonEngine, isMainModule } from '@angular/ssr/node';
 import bootstrap from './src/main.server';
 import { PostService } from './backend/application/post.service';
 import { seedPosts } from './backend/application/post.seed';
@@ -15,9 +18,11 @@ import { createSurrealClient } from './backend/infrastructure/surreal/surreal.cl
 import { SurrealPageCacheRepository } from './backend/infrastructure/surreal/surreal-page-cache.repository';
 import { SurrealPostRepository } from './backend/infrastructure/surreal/surreal-post.repository';
 import { ensureSurrealSchema } from './backend/infrastructure/surreal/surreal.schema';
-import { createAuthContext } from './backend/presentation/api/auth-context';
+import { createPostsApi } from './backend/presentation/api/v1/posts/posts.api';
 import { scopedLogger } from './backend/infrastructure/logging/logger';
 import { getCorsConfig } from './backend/infrastructure/http/cors.config';
+
+type AnyElysia = Elysia<any, any, any, any, any, any, any>;
 
 const db = await createSurrealClient();
 await ensureSurrealSchema(db);
@@ -27,19 +32,47 @@ const pageCacheRepository = new SurrealPageCacheRepository(db);
 
 await seedPosts(postRepository);
 
-const port = process.env['PORT'] || 4201;
+const port = env.PORT;
 const serverDistFolder = import.meta.dirname;
+
+const allowedHosts = env.CORS_ORIGIN
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter((origin) => origin && origin !== '*')
+  .map((origin) => {
+    try {
+      const parsed = new URL(origin.includes('://') ? origin : `http://${origin}`);
+      return parsed.hostname;
+    } catch {
+      return '';
+    }
+  })
+  .filter((host): host is string => Boolean(host));
 
 const browserDistFolder = join(serverDistFolder, 'dist/treaty/browser');
 const indexHtml = join(serverDistFolder, 'dist/treaty/browser/index.html');
 const commonEngine = new CommonEngine({
-  allowedHosts: ['localhost', '127.0.0.1', 'gadgetify.io', 'origin.gadgetify.io', 'treaty.prokopis123.workers.dev'],
+  allowedHosts: allowedHosts.length > 0 ? allowedHosts : ['localhost', '127.0.0.1'],
   enablePerformanceProfiler: true,
 });
 
 const VITE_DEV_ENTRY = '<script type="module" src="/main.ts"></script>';
 const logger = scopedLogger('server');
 const corsConfig = getCorsConfig();
+const postsApi = createPostsApi(postService);
+const isDevelopment = env.NODE_ENV !== 'production';
+
+const withDevelopmentTelemetry = <T extends AnyElysia>(instance: T): T => {
+  if (!isDevelopment) {
+    return instance;
+  }
+
+  return instance.use(
+    opentelemetry({
+      serviceName: 'treaty-server',
+    })
+  ) as T;
+};
 
 function toProductionHtml(html: string): string {
   return html
@@ -52,9 +85,23 @@ function toProductionHtml(html: string): string {
     .replace(/href="(chunk-[^"]+\.css)"/g, 'href="/$1"');
 }
 
-let app = new Elysia()
-  .use(cors(corsConfig))
-  .derive(({ request: { url } }) => {
+const app = withDevelopmentTelemetry(
+  new Elysia()
+    .use(cors(corsConfig))
+    .use(
+      serverTiming({
+        enabled: isDevelopment,
+        allow: ({ request }) => {
+          const pathname = new URL(request.url).pathname;
+          return !pathname.includes('.');
+        },
+        trace: {
+          handle: true,
+          total: true,
+        },
+      })
+    )
+).derive(({ request: { url } }) => {
     const _url = new URL(url);
 
     return {
@@ -65,56 +112,8 @@ let app = new Elysia()
   })
   .group('/api', (api) => {
     return api
-      .get('/posts', async () => {
-        const result = await postService.listWithMeta();
-
-        return {
-          data: result.data,
-          meta: result.meta,
-        };
-      })
-      .get(
-        '/posts/:id',
-        async ({ params: { id }, set }) => {
-          const post = await postService.getById(id);
-
-          if (!post) {
-            set.status = 404;
-            return { data: null };
-          }
-
-          return { data: post };
-        },
-        {
-          params: t.Object({
-            id: t.String(),
-          }),
-        }
-      )
-      .post(
-        '/posts',
-        async ({ body, headers }) => {
-          const auth = createAuthContext(headers);
-          const created = await postService.create(body, auth);
-
-          return { data: created };
-        },
-        {
-          body: t.Object({
-            title: t.String({ minLength: 3 }),
-            content: t.String({ minLength: 10 }),
-            source: t.Optional(t.String()),
-          }),
-        }
-      )
-      .get('/id/:id', ({ params: { id } }) => ({ data: `Post with id: ${id}` }))
-      .get('/example', () => 'just an example')
-      .post('/form', ({ body }) => body, {
-        body: t.Object({
-          strField: t.String(),
-          numbField: t.Number(),
-        }),
-      });
+      .get('/health', () => ({ status: 'ok' as const }))
+      .use(postsApi);
   })
   .get('*.*', async ({ originalUrl }) => {
     const file = Bun.file(`${browserDistFolder}${originalUrl}`);
@@ -186,9 +185,10 @@ let app = new Elysia()
     }
   });
 
-app.listen(port);
+if (isMainModule(import.meta.url)) {
+  app.listen(port);
+  logger.success(`Elysia is running at ${app.server?.hostname}:${app.server?.port}`);
+}
 
-logger.success(`Elysia is running at ${app.server?.hostname}:${app.server?.port}`);
-
-export const reqHandler = app.handle
+export const reqHandler = app.handle;
 export type App = typeof app;
