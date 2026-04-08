@@ -220,7 +220,7 @@ if (isMainModule(import.meta.url)) {
 // }
 
 
-// if (process.env['PRODUCTION'] === 'false') {
+// if (env.NODE_ENV !== 'production') {
 // run()
 // }
 export const reqHandler = app.handle // createRequestHandler(serveapp().fetch)

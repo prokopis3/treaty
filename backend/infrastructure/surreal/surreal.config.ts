@@ -1,3 +1,5 @@
+import { env } from '../../../config/env';
+
 export type SurrealAuthMode = 'none' | 'database' | 'namespace' | 'root' | 'token';
 
 export type SurrealConnectionConfig = {
@@ -13,8 +15,8 @@ export type SurrealConnectionConfig = {
 
 const DEFAULT_ENDPOINT = 'ws://127.0.0.1:8000/rpc';
 
-function clean(value: string | undefined): string | undefined {
-  const trimmed = value?.trim();
+function clean(value: string | number | undefined): string | undefined {
+  const trimmed = value !== undefined ? String(value).trim() : undefined;
   return trimmed ? trimmed : undefined;
 }
 
@@ -33,26 +35,25 @@ function normalizeEndpoint(endpoint: string): string {
 }
 
 export function getSurrealConnectionConfig(
-  env: Record<string, string | undefined> = process.env
 ): SurrealConnectionConfig {
   const endpoint = normalizeEndpoint(
-    clean(env['SURREAL_ENDPOINT']) ?? DEFAULT_ENDPOINT
+    clean(env.SURREAL_ENDPOINT) ?? DEFAULT_ENDPOINT
   );
-  const accessToken = clean(env['SURREAL_ACCESS_TOKEN']);
-  const username = clean(env['SURREAL_USERNAME']);
-  const password = clean(env['SURREAL_PASSWORD']);
-  const authMode = (clean(env['SURREAL_AUTH_MODE']) as SurrealAuthMode | undefined)
+  const accessToken = clean(env.SURREAL_ACCESS_TOKEN);
+  const username = clean(env.SURREAL_USERNAME);
+  const password = clean(env.SURREAL_PASSWORD);
+  const authMode = (clean(env.SURREAL_AUTH_MODE) as SurrealAuthMode | undefined)
     ?? (accessToken ? 'token' : username && password ? 'database' : 'none');
 
   return {
     endpoint,
-    namespace: clean(env['SURREAL_NAMESPACE']) ?? 'test',
-    database: clean(env['SURREAL_DATABASE']) ?? 'test',
+    namespace: clean(env.SURREAL_NAMESPACE) ?? 'test',
+    database: clean(env.SURREAL_DATABASE) ?? 'test',
     username,
     password,
     accessToken,
     authMode,
-    strict: clean(env['SURREAL_STRICT']) === 'true',
+    strict: clean(env.SURREAL_STRICT) === 'true',
   };
 }
 

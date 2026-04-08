@@ -1,12 +1,12 @@
+import { env } from '../../../config/env';
+
 type CorsConfig = {
   origin?: string[];
   credentials?: boolean;
 };
 
-export function getCorsConfig(
-  env: Record<string, string | undefined> = process.env
-): CorsConfig {
-  const rawOrigins = env['CORS_ORIGIN'] ?? '';
+export function getCorsConfig(): CorsConfig {
+  const rawOrigins = String(env.CORS_ORIGIN ?? '');
   const origins = rawOrigins
     .split(',')
     .map((entry) => entry.trim())
@@ -18,7 +18,7 @@ export function getCorsConfig(
     config.origin = origins;
   }
 
-  if ((env['CORS_CREDENTIALS'] ?? '').toLowerCase() === 'true') {
+  if (String(env.CORS_CREDENTIALS ?? '').toLowerCase() === 'true') {
     config.credentials = true;
   }
 

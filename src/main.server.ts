@@ -2,8 +2,9 @@ import { bootstrapApplication, BootstrapContext } from '@angular/platform-browse
 import { enableProdMode } from '@angular/core';
 import { AppComponent } from './app/app.component';
 import { config } from './app/app.config.server';
+import { env } from '../config/env';
 
-if (process.env['NODE_ENV'] === 'production') {
+if (env.NODE_ENV === 'production') {
 	enableProdMode();
 }
 

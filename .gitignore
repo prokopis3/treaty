@@ -48,3 +48,4 @@ Thumbs.db
 .wrangler/
 src/tailwind.generated.css
 server.bundle.js
+.env.dev

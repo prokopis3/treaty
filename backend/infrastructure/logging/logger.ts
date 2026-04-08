@@ -1,11 +1,12 @@
 import { createConsola, type ConsolaInstance } from 'consola';
+import { env } from '../../../config/env';
 
 type AppLogLevel = 'silent' | 'error' | 'warn' | 'log' | 'info' | 'debug' | 'trace';
 
 function resolveLogLevel(): AppLogLevel {
-  const explicitLevel = (process.env['APP_LOG_LEVEL'] ?? '').toLowerCase();
+  const explicitLevel = (env.APP_LOG_LEVEL ?? '').toLowerCase();
   const debugEnabled = ['1', 'true', 'yes', 'on'].includes(
-    (process.env['APP_DEBUG_LOGS'] ?? '').toLowerCase()
+    (env.APP_DEBUG_LOGS ?? '').toLowerCase()
   );
 
   if (debugEnabled) {
@@ -22,7 +23,7 @@ function resolveLogLevel(): AppLogLevel {
     case 'trace':
       return explicitLevel;
     default:
-      return process.env['NODE_ENV'] === 'production' ? 'info' : 'debug';
+      return env.NODE_ENV === 'production' ? 'info' : 'debug';
   }
 }
 
@@ -53,7 +54,7 @@ export const appLogger = createConsola({
   level: appLogLevel,
   formatOptions: {
     date: true,
-    colors: !process.env['NO_COLOR'],
+    colors: !env.NO_COLOR,
   },
 });
 
