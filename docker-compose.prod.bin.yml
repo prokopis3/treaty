@@ -1,0 +1,10 @@
+services:
+  app:
+    build:
+      target: runtime-bin
+    command:
+      [
+        "sh",
+        "-c",
+        "export DOTENV_PRIVATE_KEY_PRODUCTION=\"$(tr -d '\\r\\n' </run/secrets/dotenv_private_key_production)\"; export RUN_AS_BIN=true; exec ./treaty-server",
+      ]

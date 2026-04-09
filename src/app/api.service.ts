@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { App } from 'server';
+import type { App } from 'server';
 import { edenClient } from '../libs/edenclient';
 
 @Injectable({

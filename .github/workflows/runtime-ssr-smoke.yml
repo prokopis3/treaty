@@ -1,0 +1,39 @@
+name: Runtime SSR Smoke
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  runtime-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.11
+
+      - name: Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Guard Type-Only Server Imports
+        run: bun run guard:imports
+
+      - name: Build Angular SSR Output
+        run: bun run build
+
+      - name: Build Runtime Bundle
+        run: bun run build:runtime:bundle
+
+      - name: Build Runtime Binary
+        run: bun run build:runtime:bin
+
+      - name: Run SSR Runtime Smoke Tests
+        run: bun run test:ssr:runtimes

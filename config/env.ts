@@ -5,23 +5,53 @@ import { resolve } from 'node:path';
 const nodeEnvForFileSelection = process.env['NODE_ENV'] || 'development';
 const defaultEnvFile = '.env';
 const developmentEnvFile = '.env.dev';
+const productionEnvFile = '.env.production';
+const truthyEnvValues = ['1', 'true', 'yes', 'on'];
+
+const isTruthyEnvValue = (value?: string): boolean => {
+  return truthyEnvValues.includes((value || '').toLowerCase());
+};
 
 const envFileToLoad = (() => {
-  if (nodeEnvForFileSelection !== 'development') {
-    return defaultEnvFile;
+  if (nodeEnvForFileSelection === 'development') {
+    const developmentEnvPath = resolve(process.cwd(), developmentEnvFile);
+
+    if (existsSync(developmentEnvPath)) {
+      return developmentEnvFile;
+    }
+
+    const defaultEnvPath = resolve(process.cwd(), defaultEnvFile);
+    if (existsSync(defaultEnvPath)) {
+      console.warn(`Environment file ${developmentEnvFile} was not found. Falling back to ${defaultEnvFile}.`);
+      return defaultEnvFile;
+    }
+
+    return null;
   }
 
-  const developmentEnvPath = resolve(process.cwd(), developmentEnvFile);
+  if (nodeEnvForFileSelection === 'production') {
+    const productionEnvPath = resolve(process.cwd(), productionEnvFile);
 
-  if (existsSync(developmentEnvPath)) {
-    return developmentEnvFile;
+    if (existsSync(productionEnvPath)) {
+      return productionEnvFile;
+    }
+
+    const defaultEnvPath = resolve(process.cwd(), defaultEnvFile);
+    if (existsSync(defaultEnvPath)) {
+      console.warn(`Environment file ${productionEnvFile} was not found. Falling back to ${defaultEnvFile}.`);
+      return defaultEnvFile;
+    }
+
+    return null;
   }
 
-  console.warn(`Environment file ${developmentEnvFile} was not found. Falling back to ${defaultEnvFile}.`);
-  return defaultEnvFile;
+  const defaultEnvPath = resolve(process.cwd(), defaultEnvFile);
+  return existsSync(defaultEnvPath) ? defaultEnvFile : null;
 })();
 
-dotenvx.config({ path: envFileToLoad, quiet: true });
+if (envFileToLoad) {
+  dotenvx.config({ path: envFileToLoad, quiet: true });
+}
 
 const getEnv = () => {
   const nodeEnv = process.env['NODE_ENV'] || 'development';
@@ -32,7 +62,10 @@ const getEnv = () => {
     PORT: parseInt(process.env['PORT'] || '4201', 10),
     APP_LOG_LEVEL: process.env['APP_LOG_LEVEL'] || '',
     APP_DEBUG_LOGS: process.env['APP_DEBUG_LOGS'] || 'false',
-    NO_COLOR: Boolean(process.env['NO_COLOR']) || false,
+    NO_COLOR: isTruthyEnvValue(process.env['NO_COLOR']),
+    OTEL_ENABLED_DEV: isTruthyEnvValue(process.env['OTEL_ENABLED_DEV']),
+    OTEL_ENABLED_PROD: isTruthyEnvValue(process.env['OTEL_ENABLED_PROD']),
+    SERVER_TIMING_ENABLED: isTruthyEnvValue(process.env['SERVER_TIMING_ENABLED']),
     CORS_ORIGIN: process.env['CORS_ORIGIN'] || '',
     CORS_CREDENTIALS: process.env['CORS_CREDENTIALS'] || 'false',
     SURREAL_ENDPOINT: process.env['SURREAL_ENDPOINT'] || '',
@@ -60,4 +93,6 @@ const getEnv = () => {
 };
 
 export const env = getEnv();
+export const isDevelopment = env.NODE_ENV !== 'production';
+export const isProduction = env.NODE_ENV === 'production';
 export type Env = typeof env;

@@ -8,9 +8,12 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
+      HOST: ${HOST:-localhost}
       PORT: 4201
       APP_LOG_LEVEL: ${APP_LOG_LEVEL:-info}
       APP_DEBUG_LOGS: ${APP_DEBUG_LOGS:-false}
+      NO_COLOR: ${NO_COLOR:-}
+      OTEL_ENABLED_DEV: ${OTEL_ENABLED_DEV:-false}
       CORS_ORIGIN: ${CORS_ORIGIN:-}
       CORS_CREDENTIALS: ${CORS_CREDENTIALS:-false}
       SURREAL_ENDPOINT: ${SURREAL_ENDPOINT}
@@ -20,13 +23,26 @@ services:
       SURREAL_USERNAME: ${SURREAL_USERNAME}
       SURREAL_PASSWORD: ${SURREAL_PASSWORD}
       SURREAL_ACCESS_TOKEN: ${SURREAL_ACCESS_TOKEN}
+      SURREAL_STRICT: ${SURREAL_STRICT:-false}
+      OTEL_ENABLED_PROD: ${OTEL_ENABLED_PROD:-false}
+      SERVER_TIMING_ENABLED: ${SERVER_TIMING_ENABLED:-false}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:-}
+    command:
+      [
+        "sh",
+        "-c",
+        "export DOTENV_PRIVATE_KEY_PRODUCTION=\"$(tr -d '\\r\\n' </run/secrets/dotenv_private_key_production)\"; exec bun --no-env-file dist/treaty/server/server.mjs",
+      ]
+    secrets:
+      - dotenv_private_key_production
     healthcheck:
       test:
         [
           "CMD",
           "bun",
           "-e",
-          "fetch('http://127.0.0.1:4201').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+          "fetch('http://127.0.0.1:4201/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 30s
       timeout: 5s
@@ -34,6 +50,8 @@ services:
       start_period: 20s
     expose:
       - "4201"
+    ports:
+      - "4200:4201"
 
   cloudflared:
     image: cloudflare/cloudflared:latest
@@ -43,3 +61,7 @@ services:
       app:
         condition: service_healthy
     command: tunnel --no-autoupdate run --token ${CLOUDFLARED_TOKEN}
+
+secrets:
+  dotenv_private_key_production:
+    file: ${DOTENV_PRIVATE_KEY_FILE:-.docker/secrets/dotenv_private_key_production}

@@ -49,3 +49,6 @@ Thumbs.db
 src/tailwind.generated.css
 server.bundle.js
 .env.dev
+.env.keys
+.dev.vars*
+.docker/secrets/

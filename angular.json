@@ -42,9 +42,30 @@
             "outputPath": "dist/treaty",
             "index": "src/index.html",
             "browser": "src/main.ts",
+            "server": "src/main.server.ts",
+            "ssr": {
+              "entry": "server.ts"
+            },
             "prerender": false,
             "polyfills": [],
             "tsConfig": "tsconfig.app.json",
+            "externalDependencies": [
+              "elysia",
+              "@elysiajs/cors",
+              "@elysiajs/opentelemetry",
+              "@elysiajs/server-timing",
+              "@opentelemetry/sdk-trace-node",
+              "@opentelemetry/exporter-trace-otlp-proto",
+              "@dotenvx/dotenvx",
+              "surrealdb",
+              "cookie",
+              "fast-decode-uri-component",
+              "debug",
+              "protobufjs/minimal",
+              "ieee754",
+              "@opentelemetry/context-async-hooks",
+              "@opentelemetry/sdk-node"
+            ],
             "inlineStyleLanguage": "scss",
             "assets": ["src/favicon.ico", "src/assets"],
             "styles": ["src/tailwind.generated.css"],
@@ -70,6 +91,8 @@
               "outputHashing": "all"
             },
             "development": {
+              "server": false,
+              "ssr": false,
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true

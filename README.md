@@ -2,10 +2,10 @@
 
 Is Angular in perfect harmony in the Bun runtime using Elysia.js and Surrealdb
 
-- Angular v17.2.0
-- Bun 1.0.26
+- Angular v20.3.x
+- Bun 1.3.x
 - surrealdb 3.x
-- Elysia 0.8
+- Elysia 1.4
 
 ## Extra features
 
@@ -26,7 +26,7 @@ Is Angular in perfect harmony in the Bun runtime using Elysia.js and Surrealdb
 - `bun i`
 - `bun run surreal:init` (optional when using remote SurrealDB)
 - `bun run build`
-- `bun run server.ts`
+- `bun run server`
 
 ## Vite + Elysia dev
 
@@ -68,9 +68,9 @@ This project runs SSR/API on Bun+Elysia. Use Cloudflare Worker as a reverse prox
 	- `bun i`
 	- `bun run build`
 	- `bun run server`
-3. Configure Wrangler Worker in this repo:
+3. Configure Wrangler Worker deploy input:
 	- `wrangler login`
-	- edit `wrangler.toml` and set `ORIGIN_URL` to your Bun origin
+	- set `CF_ORIGIN_URL` in `.env.production`
 4. Deploy proxy Worker:
 	- `bun run cf:deploy`
 5. Attach your domain route in Cloudflare dashboard to the Worker
@@ -91,10 +91,20 @@ Files added for this flow:
 Setup once:
 
 1. Create a Cloudflare Tunnel in Zero Trust and copy the tunnel token
-2. Copy `.env.production.example` to `.env.production` and set `CLOUDFLARED_TOKEN`
-3. In Cloudflare Tunnel `Public Hostname`, configure an origin host (example: `origin.example.com`) pointing to service URL `http://app:4201`
-4. In `wrangler.toml`, set `ORIGIN_URL` to your origin host URL (example: `https://origin.example.com`)
+2. Copy `.env.production.example` to `.env.production`
+3. Set production values in `.env.production`, including `CLOUDFLARED_TOKEN` and `CF_ORIGIN_URL`
+4. In Cloudflare Tunnel `Public Hostname`, configure an origin host (example: `origin.example.com`) pointing to service URL `http://app:4201`
 5. In Cloudflare Workers routes, map your app host (example: `app.example.com/*`) to this worker
+
+Secrets workflow:
+
+1. Encrypt `.env.production` locally:
+	- `bun run env:prod:encrypt`
+2. Keep `.env.keys` local only. Do not commit it.
+3. Set `DOTENV_PRIVATE_KEY_PRODUCTION` in your shell/CI secret store.
+4. Production scripts (`prod`, `docker:prod:up`, `docker:prod:down`, `cf:prepare`, `cf:secrets:sync`, `cf:deploy`) now require `DOTENV_PRIVATE_KEY_PRODUCTION` and will fail fast if it is missing.
+5. `docker:prod:up`, `docker:prod:down`, `prod`, and `cf:deploy` run through `dotenvx`, so encrypted `.env.production` works without Docker or Wrangler reading plaintext env files.
+6. If your Worker needs secrets, set `CF_SECRET_KEYS` to a comma-separated list of ENV variable names (for example `API_TOKEN,DB_PASSWORD`), and `bun run cf:deploy` will upload them via `wrangler secret put` before deploy.
 
 Deploy with one command:
 
@@ -105,6 +115,7 @@ Supporting commands:
 - `bun run docker:prod:up`
 - `bun run docker:prod:down`
 - `bun run cf:deploy`
+- `bun run env:prod:encrypt`
 
 Routing note:
 
