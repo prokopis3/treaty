@@ -2,17 +2,21 @@ import * as dotenvx from '@dotenvx/dotenvx';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const nodeEnvForFileSelection = process.env['NODE_ENV'] || 'development';
 const defaultEnvFile = '.env';
 const developmentEnvFile = '.env.dev';
 const productionEnvFile = '.env.production';
 const truthyEnvValues = ['1', 'true', 'yes', 'on'];
+let loadedEnvFile: string | null | undefined;
+
+const readProcessEnv = (key: string): string | undefined => {
+  return process.env[key];
+};
 
 const isTruthyEnvValue = (value?: string): boolean => {
   return truthyEnvValues.includes((value || '').toLowerCase());
 };
 
-const envFileToLoad = (() => {
+const resolveEnvFileToLoad = (nodeEnvForFileSelection: string): string | null => {
   if (nodeEnvForFileSelection === 'development') {
     const developmentEnvPath = resolve(process.cwd(), developmentEnvFile);
 
@@ -47,36 +51,53 @@ const envFileToLoad = (() => {
 
   const defaultEnvPath = resolve(process.cwd(), defaultEnvFile);
   return existsSync(defaultEnvPath) ? defaultEnvFile : null;
-})();
+};
 
-if (envFileToLoad) {
-  dotenvx.config({ path: envFileToLoad, quiet: true });
-}
+const ensureEnvFileLoaded = (nodeEnvForFileSelection: string): void => {
+  if (loadedEnvFile !== undefined) {
+    return;
+  }
+
+  const envFileToLoad = resolveEnvFileToLoad(nodeEnvForFileSelection);
+
+  if (envFileToLoad) {
+    dotenvx.config({ path: envFileToLoad, quiet: true });
+  }
+
+  loadedEnvFile = envFileToLoad;
+};
 
 const getEnv = () => {
-  const nodeEnv = process.env['NODE_ENV'] || 'development';
+  const nodeEnv = readProcessEnv('NODE_ENV') || 'development';
+
+  ensureEnvFileLoaded(nodeEnv);
 
   const env = {
     NODE_ENV: nodeEnv,
-    HOST: process.env['HOST'] || 'localhost',
-    PORT: parseInt(process.env['PORT'] || '4201', 10),
-    APP_LOG_LEVEL: process.env['APP_LOG_LEVEL'] || '',
-    APP_DEBUG_LOGS: process.env['APP_DEBUG_LOGS'] || 'false',
-    NO_COLOR: isTruthyEnvValue(process.env['NO_COLOR']),
-    OTEL_ENABLED_DEV: isTruthyEnvValue(process.env['OTEL_ENABLED_DEV']),
-    OTEL_ENABLED_PROD: isTruthyEnvValue(process.env['OTEL_ENABLED_PROD']),
-    SERVER_TIMING_ENABLED: isTruthyEnvValue(process.env['SERVER_TIMING_ENABLED']),
-    CORS_ORIGIN: process.env['CORS_ORIGIN'] || '',
-    CORS_CREDENTIALS: process.env['CORS_CREDENTIALS'] || 'false',
-    SURREAL_ENDPOINT: process.env['SURREAL_ENDPOINT'] || '',
-    SURREAL_NAMESPACE: process.env['SURREAL_NAMESPACE'] || '',
-    SURREAL_DATABASE: process.env['SURREAL_DATABASE'] || '',
-    SURREAL_AUTH_MODE: process.env['SURREAL_AUTH_MODE'] || '',
-    SURREAL_USERNAME: process.env['SURREAL_USERNAME'] || '',
-    SURREAL_PASSWORD: process.env['SURREAL_PASSWORD'] || '',
-    SURREAL_ACCESS_TOKEN: process.env['SURREAL_ACCESS_TOKEN'] || '',
-    SURREAL_STRICT: process.env['SURREAL_STRICT'] || 'false',
-    CLOUDFLARED_TOKEN: process.env['CLOUDFLARED_TOKEN'] || '',
+    HOST: readProcessEnv('HOST') || 'localhost',
+    PORT: parseInt(readProcessEnv('PORT') || '4201', 10),
+    APP_LOG_LEVEL: readProcessEnv('APP_LOG_LEVEL') || '',
+    APP_DEBUG_LOGS: readProcessEnv('APP_DEBUG_LOGS') || 'false',
+    NO_COLOR: isTruthyEnvValue(readProcessEnv('NO_COLOR')),
+    OTEL_ENABLED_DEV: isTruthyEnvValue(readProcessEnv('OTEL_ENABLED_DEV')),
+    OTEL_ENABLED_PROD: isTruthyEnvValue(readProcessEnv('OTEL_ENABLED_PROD')),
+    OTEL_EXPORTER_OTLP_ENDPOINT: readProcessEnv('OTEL_EXPORTER_OTLP_ENDPOINT') || '',
+    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: readProcessEnv('OTEL_EXPORTER_OTLP_TRACES_ENDPOINT') || '',
+    SERVER_TIMING_ENABLED: isTruthyEnvValue(readProcessEnv('SERVER_TIMING_ENABLED')),
+    CORS_ORIGIN: readProcessEnv('CORS_ORIGIN') || '',
+    CORS_CREDENTIALS: readProcessEnv('CORS_CREDENTIALS') || 'false',
+    SURREAL_ENDPOINT: readProcessEnv('SURREAL_ENDPOINT') || '',
+    SURREAL_NAMESPACE: readProcessEnv('SURREAL_NAMESPACE') || '',
+    SURREAL_DATABASE: readProcessEnv('SURREAL_DATABASE') || '',
+    SURREAL_AUTH_MODE: readProcessEnv('SURREAL_AUTH_MODE') || '',
+    SURREAL_USERNAME: readProcessEnv('SURREAL_USERNAME') || '',
+    SURREAL_PASSWORD: readProcessEnv('SURREAL_PASSWORD') || '',
+    SURREAL_ACCESS_TOKEN: readProcessEnv('SURREAL_ACCESS_TOKEN') || '',
+    SURREAL_STRICT: readProcessEnv('SURREAL_STRICT') || 'false',
+    CLOUDFLARED_TOKEN: readProcessEnv('CLOUDFLARED_TOKEN') || '',
+    NODE_CLUSTER: readProcessEnv('NODE_CLUSTER') || 'auto',
+    RUN_AS_BIN: readProcessEnv('RUN_AS_BIN') === 'true',
+    APP_DISABLE_DB: readProcessEnv('APP_DISABLE_DB') || 'false',
   } as const;
 
   if (env.NODE_ENV === 'production') {

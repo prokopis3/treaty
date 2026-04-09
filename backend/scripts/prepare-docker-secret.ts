@@ -1,8 +1,8 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync, lstatSync, rmSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 
-const OUTPUT_PATH = process.env.DOTENV_PRIVATE_KEY_FILE || '.docker/secrets/dotenv_private_key_production'
-const keyFromEnv = (process.env.DOTENV_PRIVATE_KEY_PRODUCTION || '').trim()
+const OUTPUT_PATH = process.env['DOTENV_PRIVATE_KEY_FILE'] || '.docker/secrets/dotenv_private_key_production'
+const keyFromEnv = (process.env['DOTENV_PRIVATE_KEY_PRODUCTION'] || '').trim()
 
 const parseEnvKeysFile = (): string => {
   if (!existsSync('.env.keys')) {

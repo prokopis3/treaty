@@ -33,7 +33,14 @@ export async function resolveBrowserDistFolder(
   usesBuiltServerArtifacts: boolean
 ): Promise<string> {
   if (usesBuiltServerArtifacts) {
-    return join(serverDistFolder, '..', 'browser');
+    const candidates = [
+      join(serverDistFolder, '..', 'browser'),
+      join(process.cwd(), 'dist', 'treaty', 'browser'),
+      join(dirname(process.execPath), 'dist', 'treaty', 'browser'),
+      join(dirname(process.execPath), '..', 'treaty', 'browser'),
+    ];
+
+    return candidates.find(existsSync) ?? candidates[0];
   }
 
   const embedded = await extractEmbeddedBrowserDist(serverDistFolder);

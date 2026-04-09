@@ -45,8 +45,8 @@ async function applyDevelopmentTelemetry<T extends AnyElysia>(instance: T): Prom
         '@opentelemetry/' + 'exporter-trace-otlp-proto'
       );
       const otlpUrl =
-        process.env['OTEL_EXPORTER_OTLP_TRACES_ENDPOINT'] ||
-        process.env['OTEL_EXPORTER_OTLP_ENDPOINT'];
+        env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT ||
+        env.OTEL_EXPORTER_OTLP_ENDPOINT;
 
       return instance.use(
         opentelemetry({

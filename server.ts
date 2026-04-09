@@ -4,7 +4,8 @@ import './treaty-utilities/mock-zone';
 import { Elysia } from 'elysia';
 import { cors } from '@elysiajs/cors';
 import { existsSync } from 'node:fs';
-import { join } from 'path';
+import { isAbsolute, join } from 'path';
+import { pathToFileURL } from 'node:url';
 import { env } from './config/env';
 import { PostService } from './backend/application/post.service';
 import { seedPosts } from './backend/application/post.seed';
@@ -19,20 +20,23 @@ import { applyServerPlugins } from './backend/infrastructure/http/plugins';
 import { resolveBrowserDistFolder, resolveIndexHtml, resolveServerMainEntry } from './backend/infrastructure/ssr/browser-dist.resolver';
 import { toProductionHtml } from './backend/infrastructure/ssr/html-transform';
 import { InMemoryPageCacheRepository } from './backend/infrastructure/page-cache/in-memory-page-cache.repository';
+import { startServerWithClustering } from './backend/infrastructure/clustering';
 import type { PageCacheAdapter } from './backend/infrastructure/page-cache/page-cache.adapter';
 
 const logger = scopedLogger('server');
 const serverDistFolder = import.meta.dirname;
-const isCompiledServerRuntime = existsSync(join(serverDistFolder, 'main.server.mjs'));
-const isBinaryRuntime = process.env['RUN_AS_BIN'] === 'true';
-const usesBuiltServerArtifacts = isCompiledServerRuntime;
-const disableDatabase = process.env['APP_DISABLE_DB'] === 'true';
+const builtServerMainEntry = resolveServerMainEntry(serverDistFolder, true);
+const usesBuiltServerArtifacts = existsSync(builtServerMainEntry);
+const disableDatabase = env.APP_DISABLE_DB === 'true';
 
 const dynamicImport = <T>(specifier: string): Promise<T> => {
+  const resolvedSpecifier = isAbsolute(specifier)
+    ? pathToFileURL(specifier).href
+    : specifier;
   const importer = new Function('modulePath', 'return import(modulePath)') as (
     modulePath: string
   ) => Promise<T>;
-  return importer(specifier);
+  return importer(resolvedSpecifier);
 };
 
 let pageCacheRepository: PageCacheAdapter;
@@ -51,8 +55,8 @@ if (!disableDatabase) {
   pageCacheRepository = new InMemoryPageCacheRepository();
 }
 
-if (!isCompiledServerRuntime || isBinaryRuntime) {
-  // Source runtime path may require JIT fallback for partially-compiled packages.
+if (!usesBuiltServerArtifacts || env.NODE_ENV !== 'production') {
+  // Development/source runtime paths may require JIT fallback for partially-compiled packages.
   await import('@angular/compiler');
 }
 
@@ -78,7 +82,7 @@ const allowedHosts = [...new Set([
 const browserDistFolder = await resolveBrowserDistFolder(serverDistFolder, usesBuiltServerArtifacts);
 const indexHtml = resolveIndexHtml(browserDistFolder, serverDistFolder, usesBuiltServerArtifacts);
 const bootstrap = usesBuiltServerArtifacts
-  ? (await dynamicImport<{ default: unknown }>(resolveServerMainEntry(serverDistFolder, true))).default
+  ? (await dynamicImport<{ default: unknown }>(builtServerMainEntry)).default
   : (await import('./src/main.server')).default;
 const ssrBootstrap = bootstrap as any;
 const commonEngine = new CommonEngine({ allowedHosts, enablePerformanceProfiler: true });
@@ -140,9 +144,15 @@ const app = (await applyServerPlugins(new Elysia().use(cors(getCorsConfig()))))
     }
   });
 
-if (isMainModule(import.meta.url) || process.env['RUN_AS_BIN'] === 'true') {
-  app.listen(env.PORT);
-  logger.success(`Elysia is running at ${app.server?.hostname}:${app.server?.port}`);
+if (isMainModule(import.meta.url) || env.RUN_AS_BIN) {
+  // Start server with optional multi-process clustering (refactored into /backend/infrastructure/clustering)
+  await startServerWithClustering({
+    app,
+    port: env.PORT,
+    scriptUrl: import.meta.url,
+    logger,
+    nodeClusterEnv: env.NODE_CLUSTER,
+  });
 }
 
 export const reqHandler = app.handle;
