@@ -78,6 +78,12 @@ export function resolveIndexHtml(
     : join(browserDistFolder, 'index.html');
 }
 
+export function resolveBrowserIndexHtml(browserDistFolder: string): string {
+  return existsSync(join(browserDistFolder, 'index.csr.html'))
+    ? join(browserDistFolder, 'index.csr.html')
+    : join(browserDistFolder, 'index.html');
+}
+
 export function resolveServerMainEntry(
   serverDistFolder: string,
   usesBuiltServerArtifacts: boolean
