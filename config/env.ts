@@ -104,6 +104,7 @@ const getEnv = () => {
     APP_PAGE_CACHE_PROVIDER: readProcessEnv('APP_PAGE_CACHE_PROVIDER') || 'surreal',
     APP_PAGE_CACHE_KEY_PREFIX: readProcessEnv('APP_PAGE_CACHE_KEY_PREFIX') || 'page-cache:',
     APP_PAGE_CACHE_TTL_SECONDS: parseInt(readProcessEnv('APP_PAGE_CACHE_TTL_SECONDS') || '0', 10),
+    APP_HTML_CACHE_MODE: readProcessEnv('APP_HTML_CACHE_MODE') || 'shared-shell',
     APP_HTML_CACHE_ALLOWLIST: readProcessEnv('APP_HTML_CACHE_ALLOWLIST') || '/,/posts,/post/*',
     APP_HTML_CACHE_PREWARM_ROUTES: readProcessEnv('APP_HTML_CACHE_PREWARM_ROUTES') || '/,/posts',
     UPSTASH_REDIS_REST_URL: readProcessEnv('UPSTASH_REDIS_REST_URL') || '',

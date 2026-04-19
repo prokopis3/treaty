@@ -36,6 +36,13 @@ const parseCsv = (value: string): string[] => {
 const htmlCacheAllowlist = new Set(parseCsv(env.APP_HTML_CACHE_ALLOWLIST));
 const htmlCachePrewarmRoutes = parseCsv(env.APP_HTML_CACHE_PREWARM_ROUTES);
 const hotHtmlCache = new Map<string, string>();
+const sharedShellCacheKey = '__html-shell__';
+const cacheMode = env.APP_HTML_CACHE_MODE.trim().toLowerCase();
+const useSharedShellCache = cacheMode !== 'route';
+
+const resolveHtmlCacheKey = (urlPath: string): string => {
+  return useSharedShellCache ? sharedShellCacheKey : urlPath;
+};
 
 const routeAllowedByPrefix = (urlPath: string): boolean => {
   for (const route of htmlCacheAllowlist) {
@@ -60,25 +67,27 @@ let postsApi: ReturnType<typeof createPostsApi> | null = null;
 let surrealPageCacheRepository: PageCacheAdapter | null = null;
 
 const upsertCacheAsync = (urlPath: string, content: string): void => {
-  hotHtmlCache.set(urlPath, content);
+  const cacheKey = resolveHtmlCacheKey(urlPath);
+  hotHtmlCache.set(cacheKey, content);
 
-  void pageCacheRepository.upsertByUrl(urlPath, content).catch((error) => {
+  void pageCacheRepository.upsertByUrl(cacheKey, content).catch((error) => {
     logger.warn(`Failed to persist HTML cache for ${urlPath}`, error);
   });
 };
 
 const resolveCachedHtml = async (urlPath: string): Promise<string | null> => {
-  const hotContent = hotHtmlCache.get(urlPath);
+  const cacheKey = resolveHtmlCacheKey(urlPath);
+  const hotContent = hotHtmlCache.get(cacheKey);
   if (hotContent !== undefined) {
     return hotContent;
   }
 
-  const persisted = await pageCacheRepository.getByUrl(urlPath);
+  const persisted = await pageCacheRepository.getByUrl(cacheKey);
   if (!persisted?.content) {
     return null;
   }
 
-  hotHtmlCache.set(urlPath, persisted.content);
+  hotHtmlCache.set(cacheKey, persisted.content);
   return persisted.content;
 };
 
@@ -110,18 +119,24 @@ const browserIndexHtml = await Bun.file(browserIndexHtmlPath).text();
 
 // Prewarm route-level HTML cache for known hot paths to reduce first-hit latency.
 if (htmlCacheAllowlist.size > 0 && htmlCachePrewarmRoutes.length > 0) {
-  for (const route of htmlCachePrewarmRoutes) {
-    if (!routeAllowedByPrefix(route)) {
-      continue;
+  if (useSharedShellCache) {
+    hotHtmlCache.set(sharedShellCacheKey, browserIndexHtml);
+    await pageCacheRepository.upsertByUrl(sharedShellCacheKey, browserIndexHtml);
+    logger.info('Prewarmed HTML cache with shared shell key');
+  } else {
+    for (const route of htmlCachePrewarmRoutes) {
+      if (!routeAllowedByPrefix(route)) {
+        continue;
+      }
+
+      hotHtmlCache.set(route, browserIndexHtml);
+      await pageCacheRepository.upsertByUrl(route, browserIndexHtml);
     }
 
-    hotHtmlCache.set(route, browserIndexHtml);
-    await pageCacheRepository.upsertByUrl(route, browserIndexHtml);
+    logger.info(
+      `Prewarmed HTML cache for ${htmlCachePrewarmRoutes.length} route(s): ${htmlCachePrewarmRoutes.join(', ')}`
+    );
   }
-
-  logger.info(
-    `Prewarmed HTML cache for ${htmlCachePrewarmRoutes.length} route(s): ${htmlCachePrewarmRoutes.join(', ')}`
-  );
 }
 
 const app = (await applyServerPlugins(new Elysia().use(cors(getCorsConfig()))))

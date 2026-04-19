@@ -112,6 +112,27 @@ This keeps API changes visible at compile time instead of failing at runtime.
 - HTML/page cache backend is configurable through env (`surreal`, `upstash`, `memory`).
 - Cluster behavior is environment-driven and primarily useful on Linux production hosts.
 
+### HTML cache strategy (CSR shell)
+
+Treaty serves a CSR shell for non-API routes, so route responses often share the same HTML payload.
+
+- Recommended mode: `APP_HTML_CACHE_MODE=shared-shell`
+- Alternative mode: `APP_HTML_CACHE_MODE=route`
+
+`shared-shell` stores one HTML shell entry and reuses it across routes. This avoids duplicating identical cached HTML for paths like `/`, `/posts`, and `/post/:id`.
+
+Use `route` mode only when you intentionally need route-specific HTML cache entries.
+
+Example:
+
+```bash
+APP_PAGE_CACHE_PROVIDER=upstash
+APP_PAGE_CACHE_KEY_PREFIX=page-cache:
+APP_HTML_CACHE_MODE=shared-shell
+APP_HTML_CACHE_ALLOWLIST=/,/posts,/post/*
+APP_HTML_CACHE_PREWARM_ROUTES=/,/posts
+```
+
 ### Zoneless Angular
 
 - The project uses zoneless change detection with a minimal Zone shim.
