@@ -96,8 +96,18 @@ const getEnv = () => {
     SURREAL_STRICT: readProcessEnv('SURREAL_STRICT') || 'false',
     CLOUDFLARED_TOKEN: readProcessEnv('CLOUDFLARED_TOKEN') || '',
     NODE_CLUSTER: readProcessEnv('NODE_CLUSTER') || 'auto',
+    NODE_CLUSTER_MAX_WORKERS: parseInt(readProcessEnv('NODE_CLUSTER_MAX_WORKERS') || '0', 10),
+    NODE_CLUSTER_DB_CONNECTION_BUDGET: parseInt(readProcessEnv('NODE_CLUSTER_DB_CONNECTION_BUDGET') || '0', 10),
+    NODE_CLUSTER_DB_CONNECTIONS_PER_WORKER: parseInt(readProcessEnv('NODE_CLUSTER_DB_CONNECTIONS_PER_WORKER') || '2', 10),
     RUN_AS_BIN: readProcessEnv('RUN_AS_BIN') === 'true',
     APP_DISABLE_DB: readProcessEnv('APP_DISABLE_DB') || 'false',
+    APP_PAGE_CACHE_PROVIDER: readProcessEnv('APP_PAGE_CACHE_PROVIDER') || 'surreal',
+    APP_PAGE_CACHE_KEY_PREFIX: readProcessEnv('APP_PAGE_CACHE_KEY_PREFIX') || 'page-cache:',
+    APP_PAGE_CACHE_TTL_SECONDS: parseInt(readProcessEnv('APP_PAGE_CACHE_TTL_SECONDS') || '0', 10),
+    APP_HTML_CACHE_ALLOWLIST: readProcessEnv('APP_HTML_CACHE_ALLOWLIST') || '/,/posts,/post/*',
+    APP_HTML_CACHE_PREWARM_ROUTES: readProcessEnv('APP_HTML_CACHE_PREWARM_ROUTES') || '/,/posts',
+    UPSTASH_REDIS_REST_URL: readProcessEnv('UPSTASH_REDIS_REST_URL') || '',
+    UPSTASH_REDIS_REST_TOKEN: readProcessEnv('UPSTASH_REDIS_REST_TOKEN') || '',
   } as const;
 
   if (env.NODE_ENV === 'production') {
@@ -108,6 +118,16 @@ const getEnv = () => {
         console.warn(`Missing required environment variable in production: ${key}`);
       }
     });
+
+    if (env.APP_PAGE_CACHE_PROVIDER.toLowerCase() === 'upstash') {
+      const requiredUpstash = ['UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN'] as const;
+
+      requiredUpstash.forEach((key) => {
+        if (!env[key]) {
+          console.warn(`Missing required Upstash cache variable in production: ${key}`);
+        }
+      });
+    }
   }
 
   return env;

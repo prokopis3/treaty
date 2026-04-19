@@ -3,7 +3,7 @@ services:
     build:
       target: runtime
     environment:
-      NODE_CLUSTER: auto
+      NODE_CLUSTER: false
     command:
       [
         "sh",

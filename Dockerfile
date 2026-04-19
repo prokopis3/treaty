@@ -27,6 +27,12 @@ WORKDIR /app
 ENV HUSKY=0 \
     CI=1
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PATH=/usr/bin:${PATH}
+
 # Reuse node_modules from deps stage
 COPY --from=deps /app/node_modules ./node_modules
 
