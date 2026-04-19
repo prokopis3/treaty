@@ -4,8 +4,6 @@ import './treaty-utilities/mock-zone';
 import { Elysia } from 'elysia';
 import { cors } from '@elysiajs/cors';
 import { existsSync } from 'node:fs';
-import { isAbsolute, join } from 'path';
-import { pathToFileURL } from 'node:url';
 import { env } from './config/env';
 import { PostService } from './backend/application/post.service';
 import { seedPosts } from './backend/application/post.seed';
@@ -17,10 +15,9 @@ import { createPostsApi } from './backend/presentation/api/v1/posts/posts.api';
 import { scopedLogger } from './backend/infrastructure/logging/logger';
 import { getCorsConfig } from './backend/infrastructure/http/cors.config';
 import { applyServerPlugins } from './backend/infrastructure/http/plugins';
-import { resolveBrowserDistFolder, resolveIndexHtml, resolveServerMainEntry } from './backend/infrastructure/ssr/browser-dist.resolver';
-import { toProductionHtml } from './backend/infrastructure/ssr/html-transform';
-import { InMemoryPageCacheRepository } from './backend/infrastructure/page-cache/in-memory-page-cache.repository';
+import { resolveBrowserDistFolder, resolveBrowserIndexHtml, resolveServerMainEntry } from './backend/infrastructure/ssr/browser-dist.resolver';
 import { startServerWithClustering } from './backend/infrastructure/clustering';
+import { createPageCacheRepository } from './backend/infrastructure/page-cache/factory/create-page-cache.repository';
 import type { PageCacheAdapter } from './backend/infrastructure/page-cache/page-cache.adapter';
 
 const logger = scopedLogger('server');
@@ -29,63 +26,103 @@ const builtServerMainEntry = resolveServerMainEntry(serverDistFolder, true);
 const usesBuiltServerArtifacts = existsSync(builtServerMainEntry);
 const disableDatabase = env.APP_DISABLE_DB === 'true';
 
-const dynamicImport = <T>(specifier: string): Promise<T> => {
-  const resolvedSpecifier = isAbsolute(specifier)
-    ? pathToFileURL(specifier).href
-    : specifier;
-  const importer = new Function('modulePath', 'return import(modulePath)') as (
-    modulePath: string
-  ) => Promise<T>;
-  return importer(resolvedSpecifier);
+const parseCsv = (value: string): string[] => {
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
+
+const htmlCacheAllowlist = new Set(parseCsv(env.APP_HTML_CACHE_ALLOWLIST));
+const htmlCachePrewarmRoutes = parseCsv(env.APP_HTML_CACHE_PREWARM_ROUTES);
+const hotHtmlCache = new Map<string, string>();
+
+const routeAllowedByPrefix = (urlPath: string): boolean => {
+  for (const route of htmlCacheAllowlist) {
+    if (route.endsWith('*')) {
+      const prefix = route.slice(0, -1);
+      if (urlPath.startsWith(prefix)) {
+        return true;
+      }
+      continue;
+    }
+
+    if (route === urlPath) {
+      return true;
+    }
+  }
+
+  return false;
 };
 
 let pageCacheRepository: PageCacheAdapter;
 let postsApi: ReturnType<typeof createPostsApi> | null = null;
+let surrealPageCacheRepository: PageCacheAdapter | null = null;
+
+const upsertCacheAsync = (urlPath: string, content: string): void => {
+  hotHtmlCache.set(urlPath, content);
+
+  void pageCacheRepository.upsertByUrl(urlPath, content).catch((error) => {
+    logger.warn(`Failed to persist HTML cache for ${urlPath}`, error);
+  });
+};
+
+const resolveCachedHtml = async (urlPath: string): Promise<string | null> => {
+  const hotContent = hotHtmlCache.get(urlPath);
+  if (hotContent !== undefined) {
+    return hotContent;
+  }
+
+  const persisted = await pageCacheRepository.getByUrl(urlPath);
+  if (!persisted?.content) {
+    return null;
+  }
+
+  hotHtmlCache.set(urlPath, persisted.content);
+  return persisted.content;
+};
 
 if (!disableDatabase) {
   const db = await createSurrealClient();
   await ensureSurrealSchema(db);
   const postRepository = new SurrealPostRepository(db);
   const postService = new PostService(postRepository);
-  pageCacheRepository = new SurrealPageCacheRepository(db);
+  surrealPageCacheRepository = new SurrealPageCacheRepository(db);
   await seedPosts(postRepository);
   postsApi = createPostsApi(postService);
 } else {
-  logger.warn('APP_DISABLE_DB=true: using in-memory cache, /api/posts routes disabled');
-  pageCacheRepository = new InMemoryPageCacheRepository();
+  logger.warn('APP_DISABLE_DB=true: /api/posts routes disabled');
 }
 
-if (!usesBuiltServerArtifacts || env.NODE_ENV !== 'production') {
-  // Development/source runtime paths may require JIT fallback for partially-compiled packages.
-  await import('@angular/compiler');
-}
-
-const { APP_BASE_HREF } = await import('@angular/common');
-const { CommonEngine, isMainModule } = await import('@angular/ssr/node');
-
-const allowedHosts = [...new Set([
-  'localhost',
-  '127.0.0.1',
-  ...env.CORS_ORIGIN
-    .split(',')
-    .map((o) => o.trim())
-    .filter((o) => o && o !== '*')
-    .flatMap((o) => {
-      try {
-        return [new URL(o.includes('://') ? o : `http://${o}`).hostname];
-      } catch {
-        return [] as string[];
-      }
-    }),
-])];
+pageCacheRepository = createPageCacheRepository({
+  provider: env.APP_PAGE_CACHE_PROVIDER,
+  surrealRepository: surrealPageCacheRepository,
+  upstashRestUrl: env.UPSTASH_REDIS_REST_URL,
+  upstashRestToken: env.UPSTASH_REDIS_REST_TOKEN,
+  upstashKeyPrefix: env.APP_PAGE_CACHE_KEY_PREFIX,
+  upstashTtlSeconds: env.APP_PAGE_CACHE_TTL_SECONDS,
+  logger,
+});
 
 const browserDistFolder = await resolveBrowserDistFolder(serverDistFolder, usesBuiltServerArtifacts);
-const indexHtml = resolveIndexHtml(browserDistFolder, serverDistFolder, usesBuiltServerArtifacts);
-const bootstrap = usesBuiltServerArtifacts
-  ? (await dynamicImport<{ default: unknown }>(builtServerMainEntry)).default
-  : (await import('./src/main.server')).default;
-const ssrBootstrap = bootstrap as any;
-const commonEngine = new CommonEngine({ allowedHosts, enablePerformanceProfiler: true });
+const browserIndexHtmlPath = resolveBrowserIndexHtml(browserDistFolder);
+const browserIndexHtml = await Bun.file(browserIndexHtmlPath).text();
+
+// Prewarm route-level HTML cache for known hot paths to reduce first-hit latency.
+if (htmlCacheAllowlist.size > 0 && htmlCachePrewarmRoutes.length > 0) {
+  for (const route of htmlCachePrewarmRoutes) {
+    if (!routeAllowedByPrefix(route)) {
+      continue;
+    }
+
+    hotHtmlCache.set(route, browserIndexHtml);
+    await pageCacheRepository.upsertByUrl(route, browserIndexHtml);
+  }
+
+  logger.info(
+    `Prewarmed HTML cache for ${htmlCachePrewarmRoutes.length} route(s): ${htmlCachePrewarmRoutes.join(', ')}`
+  );
+}
 
 const app = (await applyServerPlugins(new Elysia().use(cors(getCorsConfig()))))
   .derive(({ request: { url } }) => {
@@ -113,38 +150,34 @@ const app = (await applyServerPlugins(new Elysia().use(cors(getCorsConfig()))))
       return new Response('Not Found', { status: 404 });
     }
 
-    const cached = await pageCacheRepository.getByUrl(originalUrl);
-    if (cached) {
-      return new Response(cached.content, { headers: { 'Content-Type': 'text/html' } });
+    const pathname = originalUrl.split('?')[0] || '/';
+    const cacheEligible = routeAllowedByPrefix(pathname);
+
+    if (cacheEligible) {
+      const cachedHtml = await resolveCachedHtml(pathname);
+      if (cachedHtml) {
+        return new Response(cachedHtml, { headers: { 'Content-Type': 'text/html' } });
+      }
     }
 
     try {
       const forwardedProto = headers['x-forwarded-proto'] || protocol;
       const forwardedHost = headers['x-forwarded-host'] || headers['host'];
 
-      logger.debug(`SSR render: ${forwardedProto}://${forwardedHost}${originalUrl}`);
+      if (cacheEligible) {
+        upsertCacheAsync(pathname, browserIndexHtml);
+      }
 
-      const html = toProductionHtml(
-        await commonEngine.render({
-          bootstrap: ssrBootstrap,
-          documentFilePath: indexHtml,
-          url: `${forwardedProto}://${forwardedHost}${originalUrl}`,
-          publicPath: browserDistFolder,
-          providers: [{ provide: APP_BASE_HREF, useValue: '' }],
-        })
-      );
+      logger.debug(`CSR shell: ${forwardedProto}://${forwardedHost}${pathname}`);
 
-      await pageCacheRepository.upsertByUrl(originalUrl, html);
-      logger.debug(`SSR complete: ${originalUrl} (${html.length} chars)`);
-
-      return new Response(html, { headers: { 'Content-Type': 'text/html' } });
+      return new Response(browserIndexHtml, { headers: { 'Content-Type': 'text/html' } });
     } catch (error) {
-      logger.error(`SSR failed: ${originalUrl}`, error);
+      logger.error(`CSR shell response failed: ${originalUrl}`, error);
       return 'Missing page';
     }
   });
 
-if (isMainModule(import.meta.url) || env.RUN_AS_BIN) {
+if (import.meta.main || env.RUN_AS_BIN) {
   // Start server with optional multi-process clustering (refactored into /backend/infrastructure/clustering)
   await startServerWithClustering({
     app,
@@ -152,6 +185,9 @@ if (isMainModule(import.meta.url) || env.RUN_AS_BIN) {
     scriptUrl: import.meta.url,
     logger,
     nodeClusterEnv: env.NODE_CLUSTER,
+    nodeClusterMaxWorkers: env.NODE_CLUSTER_MAX_WORKERS,
+    nodeClusterDbConnectionBudget: env.NODE_CLUSTER_DB_CONNECTION_BUDGET,
+    nodeClusterDbConnectionsPerWorker: env.NODE_CLUSTER_DB_CONNECTIONS_PER_WORKER,
   });
 }
 
