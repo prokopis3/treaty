@@ -66,6 +66,24 @@ if (isMainModule(import.meta.url) || process.env['RUN_AS_BIN'] === 'true') {
 
 This removed ~80 lines of inline clustering code and made the main server file cleaner.
 
+## Local Development
+
+For local development (outside Docker), run:
+
+```bash
+bun run server          # Single-process mode, auto-watches for changes
+bun run server:watch   # Explicit watch mode
+dev                    # Full stack: builds Angular + Tailwind + runs server
+```
+
+Clustering is **disabled by default on Windows/macOS**. To test clustering locally on non-Linux platforms:
+
+```bash
+NODE_CLUSTER=true bun run server
+```
+
+See [main README](../README.md) for complete dev workflow commands.
+
 ## Testing NODE_CLUSTER on Linux Docker
 
 ### Prerequisites
@@ -74,8 +92,10 @@ This removed ~80 lines of inline clustering code and made the main server file c
 
 ### Test 1: Build Docker Image
 
+First, ensure the Angular app and server are built:
+
 ```bash
-cd /path/to/treaty
+bun run build
 docker build -t treaty:latest .
 ```
 

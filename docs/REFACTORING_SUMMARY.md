@@ -133,11 +133,12 @@ bun run build
 
 ### Local Startup Test (Windows)
 ```bash
-bun dist/treaty/server/server.mjs
+bun run server
 ```
 ✅ **PASSED** - Server starts successfully
 - Single-process mode (expected, Windows doesn't support SO_REUSEPORT)
 - Logs: `✔ Elysia is running at localhost:4201`
+- Note: Requires built Angular app (`bun run build` first)
 
 ### Clustering Logic Test
 
@@ -163,13 +164,13 @@ docker run -it -p 4201:4201 -e NODE_CLUSTER=false treaty:latest
 
 #### Test 3: Force Clustering on Windows (Testing)
 ```bash
-set NODE_CLUSTER=true
-bun dist/treaty/server/server.mjs
+NODE_CLUSTER=true bun run server
 ```
 **Expected:**
 - Spawns N worker processes
 - Each worker starts HTTP server
 - reusePort set (ignored on Windows)
+- Note: Requires built Angular app (`bun run build` first)
 
 ## Integration Documentation
 
@@ -197,6 +198,12 @@ Two comprehensive guides created:
 - `backend/infrastructure/clustering/worker-pool.ts` (95 lines)
 - `backend/infrastructure/clustering/server-startup.ts` (54 lines)
 - `docs/CLUSTERING_ARCHITECTURE.md` (240 lines)
+
+## Cross-References
+
+For full architecture overview, system diagram, and complete dev/deployment workflows, see the [main README](../README.md).
+
+For detailed Docker clustering testing procedures, see [DOCKER_CLUSTERING_TESTS.md](./DOCKER_CLUSTERING_TESTS.md).
 
 **Modified Files:**
 - `server.ts` - Refactored endpoint to use clustering module
