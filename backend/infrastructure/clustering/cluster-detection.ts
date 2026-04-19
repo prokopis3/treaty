@@ -10,7 +10,8 @@
 export interface ClusterConfig {
   shouldCluster: boolean;
   isClusterWorker: boolean;
-  numCpus: number;
+  numWorkers: number;
+  maxWorkers: number;
   platform: string;
   isRootUser: boolean;
 }
@@ -20,14 +21,21 @@ export interface ClusterConfig {
  * 
  * @param nodeClusterEnv - NODE_CLUSTER setting from config/env.ts ('auto', 'true', 'false')
  */
-export function detectClusterConfig(nodeClusterEnv: string = 'auto'): ClusterConfig {
-  const forceCluster = nodeClusterEnv === 'true';
-  const disableCluster = nodeClusterEnv === 'false';
+export function detectClusterConfig(
+  nodeClusterEnv: string = 'auto',
+  nodeClusterMaxWorkers: number = 0
+): ClusterConfig {
+  const normalizedNodeClusterEnv = nodeClusterEnv.trim().toLowerCase();
+  const disableCluster = normalizedNodeClusterEnv === 'false';
   const isLinux = process.platform === 'linux';
+  const forceCluster = normalizedNodeClusterEnv === 'true' && isLinux;
   const isRootUser = process.getuid?.() === 0;
   // CLUSTER_WORKER is internal flag set during worker spawning - still uses process.env
   const isClusterWorker = process.env['CLUSTER_WORKER'] === 'true';
   const numCpus = navigator.hardwareConcurrency || 2;
+  const maxWorkers = nodeClusterMaxWorkers > 0
+    ? Math.max(1, Math.min(nodeClusterMaxWorkers, numCpus))
+    : numCpus;
 
   // Clustering decision logic:
   // - Force if NODE_CLUSTER='true' (testing)
@@ -39,7 +47,8 @@ export function detectClusterConfig(nodeClusterEnv: string = 'auto'): ClusterCon
   return {
     shouldCluster,
     isClusterWorker,
-    numCpus,
+    numWorkers: maxWorkers,
+    maxWorkers,
     platform: process.platform,
     isRootUser: isRootUser || false,
   };
@@ -54,5 +63,5 @@ export function getClusterConfigSummary(config: ClusterConfig): string {
   }
 
   const mode = config.isClusterWorker ? 'worker' : 'cluster manager';
-  return `${config.numCpus}-worker cluster (${mode}) on ${config.platform}`;
+  return `${config.numWorkers}-worker cluster (${mode}) on ${config.platform}`;
 }
