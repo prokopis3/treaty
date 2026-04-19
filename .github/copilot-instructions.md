@@ -1,126 +1,121 @@
-# Treaty — Copilot Instructions
+# Treaty - Copilot Instructions
 
-Full-stack Angular 17 + Elysia (Bun) SSR proof-of-concept demonstrating end-to-end type safety via a custom RxJS-based Eden/Treaty client.
+Full-stack Angular 20 + Elysia (Bun) application with end-to-end type safety via a custom RxJS-based Eden/Treaty client.
 
-## Commands
+## Primary Runtime Model
+
+- Web rendering mode is **CSR shell**, not server-side HTML rendering.
+- `server.ts` serves API routes and static browser assets from `dist/treaty/browser`.
+- Catch-all HTML responses return the browser shell (`index.csr.html` or `index.html`).
+- HTML cache supports SurrealDB, Upstash Redis, or in-memory adapters.
+
+## Commands (Current)
 
 | Task | Command |
 |---|---|
-| Install | `bun i` |
-| Build Angular app | `bun run build` (alias: `ng build`) |
-| Run server | `bun run server.ts` |
-| Run server (watch) | `bun run --watch server.ts` |
-| Build + watch | `bun run watch` |
-| Run tests | `bun test` |
+| Install dependencies | `bun i` |
+| Build production app | `bun run build` |
+| Run server (source) | `bun run server` |
+| Run server (watch) | `bun run server:watch` |
+| Dev mode (watch + server) | `bun run dev` |
+| Dev mode with Vite frontend | `bun run dev:vite` |
+| Tests | `bun test` |
+| Production (built server) | `bun run prod` |
+| Production (bundle runtime) | `bun run prod:bundle` |
+| Production (compiled runtime binary) | `bun run prod:bin` |
 
-> **Order matters:** `bun run server.ts` requires a built app in `dist/treaty/browser/`. Always `bun run build` first.
+> Build-first rule: runtime serving requires built assets in `dist/treaty/browser`. Run `bun run build` before `bun run server` when needed.
 
-## Architecture
+## Architecture Snapshot
 
-```
-server.ts           ← Elysia HTTP server (Bun runtime)
-  └── GET /api/*    ← API routes
-  └── GET *.*       ← Static files from dist/treaty/browser/
-  └── GET *         ← Angular SSR via CommonEngine + SurrealDB HTML cache
+```text
+server.ts                         Elysia entrypoint (API + static + CSR shell)
+  -> backend/presentation/api/*   HTTP route wiring
+  -> backend/application/*        Services/use-cases
+  -> backend/domain/*             Domain contracts/models
+  -> backend/infrastructure/*     Clustering, cache, SSR helpers, DB, logging
 
-src/
-  app/
-    api.service.ts  ← Typed Eden client instantiation
-    app.routes.ts   ← Routes + functional resolvers
-    post/           ← Feature component (co-located resolver)
-  libs/
-    edenclient/     ← Custom Eden/Treaty client (RxJS, NOT fetch/promises)
-
-treaty-utilities/
-  mock-zone.ts               ← Required Zone.js shim for zoneless Angular
-  mock-create-histogram.ts   ← Patches perf_hooks for Angular's profiler
-  setup-tests.ts             ← Bun test environment (happy-dom + TestBed)
+src/app/*                         Angular app routes/components/resolvers
+src/libs/edenclient/*             Custom typed Eden client (RxJS + HttpClient)
+treaty-utilities/*                Runtime/test shims and Bun preloads
 ```
 
-## End-to-End Type Safety
+## Type-Safety Contract (Critical)
 
-The critical pattern: `server.ts` exports `export type App = typeof app`. `ApiService` imports this type and passes it to `edenClient<App>()`, giving the client full IDE inference of all routes, request/response shapes, and query params.
+`server.ts` exports `App` type from the Elysia instance, and Angular consumes it in `ApiService` through `edenClient<App>()`.
 
 ```typescript
 // server.ts
-export type App = typeof app   // ← export Elysia app type
+export type App = typeof app;
 
-// api.service.ts
-import type { App } from 'server'
-client = edenClient<App>('http://localhost:4201').api
+// src/app/api.service.ts
+import type { App } from 'server';
+client = edenClient<App>(baseUrl).api;
 ```
 
-## Key Conventions
+Do not replace this with untyped HTTP wrappers.
 
-**Zoneless Angular** — No Zone.js. All components must use `ChangeDetectionStrategy.OnPush`. The `mock-zone.ts` shim is *required* as a workaround for Angular internals that still reference `Zone.current`. It is imported at the top of `main.ts` and `server.ts`.
+## Angular Conventions (Mandatory)
 
-**Eden client injection context** — `edenClient()` calls `inject(HttpClient)` internally. It must be called in an Angular injection context (class field initializer or constructor), never lazily.
+- Zoneless setup is intentional; keep `mock-zone.ts` imports at the top of `main.ts` and `server.ts`.
+- Use `ChangeDetectionStrategy.OnPush` for all components.
+- Prefer signal APIs (`input()`, `signal()`, `computed()`) over legacy patterns for new code.
+- Keep functional resolvers near related feature components when practical.
+- Components loaded by `loadComponent()` should keep default class exports where existing routes depend on them.
 
-```typescript
-// ✅ correct
-class MyService {
-  client = edenClient<App>(baseUrl).api
-}
+## HTML Cache Strategy (Important)
 
-// ❌ wrong – outside injection context
-let client: ReturnType<typeof edenClient>
-```
+Current default: `APP_HTML_CACHE_MODE=shared-shell`
 
-**Functional resolvers co-located with components** — Resolvers live in the same file as the component they feed and are spread into `resolve`:
+- `shared-shell`: one shared HTML cache key is used for CSR shell responses.
+- `route`: one cache key per route path.
 
-```typescript
-// post.component.ts
-export const resolvePost = { post: (route) => inject(ApiService).client... }
+Because CSR shell HTML is often identical across `/`, `/posts`, and `/post/:id`, `shared-shell` is preferred to avoid duplicated cache payloads.
 
-// app.routes.ts
-resolve: { ...resolvePost }
-```
+Relevant env keys:
 
-**Default component export** — Components loaded via `loadComponent()` must use `export default class`.
+- `APP_PAGE_CACHE_PROVIDER` = `surreal` | `upstash` | `memory`
+- `APP_PAGE_CACHE_KEY_PREFIX`
+- `APP_PAGE_CACHE_TTL_SECONDS`
+- `APP_HTML_CACHE_MODE` = `shared-shell` | `route`
+- `APP_HTML_CACHE_ALLOWLIST`
+- `APP_HTML_CACHE_PREWARM_ROUTES`
+- `UPSTASH_REDIS_REST_URL`
+- `UPSTASH_REDIS_REST_TOKEN`
 
-**Signal inputs** — Prefer `input()` signals (`input<T>()`) over `@Input()` for new components. Route params/data are auto-bound via `withComponentInputBinding()`.
+## Clustering Behavior
 
-**`OnPush` everywhere** — No `Default` change detection. Every component that ever gets created must have `changeDetection: ChangeDetectionStrategy.OnPush`.
+- Clustering is orchestrated by `backend/infrastructure/clustering/*`.
+- Linux-first optimization with environment-based controls.
+- Main entrypoint calls `startServerWithClustering(...)` from `server.ts`.
 
-## Testing (Bun, not Jasmine/Jest)
+Use docs for deeper guidance:
 
-Tests use `bun:test` APIs — **not** Jasmine or Jest.
+- `docs/CLUSTERING_ARCHITECTURE.md`
+- `docs/DOCKER_CLUSTERING_TESTS.md`
 
-```typescript
-import { describe, test, expect, beforeEach } from 'bun:test'
-```
+## Testing Standards (Bun)
 
-- `setup-tests.ts` is auto-preloaded via `bunfig.toml` — it registers happy-dom and initialises `TestBed` with `provideZonelessChangeDetection()`.
-- Use `fixture.whenStable()` instead of `tick()` or repeated `fixture.detectChanges()` loops.
-- Mock dependencies by directly replacing component properties; no `jasmine.createSpy` / `jest.fn()` / `vi.fn()`.
-- Signal inputs (`input()`) are not trivially settable in tests — prefer `@Input()` for testability or avoid asserting them in specs.
+- Use `bun:test` APIs only.
+- Avoid Jasmine/Jest/Vitest API patterns.
+- Test bootstrap is in `treaty-utilities/setup-tests.ts` (preloaded via `bunfig.toml`).
 
-## Polyfills & Preloads
+## Deployment Notes
 
-| File | When loaded | Purpose |
-|---|---|---|
-| `treaty-utilities/mock-create-histogram.ts` | Always (bunfig preload + server.ts import) | Patches `perf_hooks.createHistogram` stub for Angular profiler |
-| `treaty-utilities/mock-zone.ts` | main.ts + server.ts (first import) | Provides a fake `Zone` global for zoneless Angular |
-| `treaty-utilities/setup-tests.ts` | `bun test` only (bunfig test preload) | happy-dom + TestBed init |
-
-## Notable Gotchas
-
-- **`ɵprovideZonelessChangeDetection`** is a private Angular API (v17). It will eventually become `provideZonelessChangeDetection` (no `ɵ` prefix) in a stable release.
-- **`@types/bun`** is listed in `tsconfig.app.json`'s `types` array so Angular's build sees Bun globals. Remove it if targeting Node.
-- **No Angular SSR builder** — SSR runs inside the Elysia server directly. Do not use `ng run treaty:server`.
-- **SurrealDB is an in-memory HTML cache only** — it stores rendered Angular HTML keyed by URL. It is not a general application database.
-- **`useDefineForClassFields: false`** in tsconfig is required for Angular decorators to work correctly.
-- **`skipTests: true`** in angular.json — schematics (`ng generate`) will not create spec files automatically.
-- The Eden client in `src/libs/edenclient/` is a from-scratch re-implementation based on `@elysiajs/eden` types but using Angular's `HttpClient` (Observables). Do not confuse it with upstream Eden.
+- Canonical Docker production up command: `bun run docker:prod:up:bin`
+- Combined deploy path: `bun run deploy:option-a`
+- Production env encryption and secret prep are required (`env:prod:*` scripts).
 
 ## Key Files
 
 | File | Role |
 |---|---|
-| [server.ts](../server.ts) | Elysia backend + SSR entrypoint |
+| [server.ts](../server.ts) | Runtime entrypoint (API + static + cache + clustering) |
+| [config/env.ts](../config/env.ts) | Environment parsing and runtime configuration |
+| [backend/infrastructure/page-cache/factory/create-page-cache.repository.ts](../backend/infrastructure/page-cache/factory/create-page-cache.repository.ts) | Cache provider selection (surreal/upstash/memory) |
+| [backend/infrastructure/page-cache/upstash/upstash-page-cache.repository.ts](../backend/infrastructure/page-cache/upstash/upstash-page-cache.repository.ts) | Upstash cache adapter |
+| [backend/infrastructure/surreal/surreal-page-cache.repository.ts](../backend/infrastructure/surreal/surreal-page-cache.repository.ts) | Surreal cache adapter |
 | [src/app/api.service.ts](../src/app/api.service.ts) | Typed API client instantiation |
-| [src/libs/edenclient/index.ts](../src/libs/edenclient/index.ts) | Proxy factory — how API calls become HTTP requests |
-| [src/libs/edenclient/types.ts](../src/libs/edenclient/types.ts) | Type machinery that infers the client shape from `App` |
-| [src/app/post/post.component.ts](../src/app/post/post.component.ts) | Reference implementation: OnPush, signal inputs, co-located resolver |
-| [treaty-utilities/setup-tests.ts](../treaty-utilities/setup-tests.ts) | Test environment setup — read before writing tests |
-| [bunfig.toml](../bunfig.toml) | Bun configuration — preloads and test setup |
+| [src/libs/edenclient/index.ts](../src/libs/edenclient/index.ts) | Proxy factory for typed HTTP calls |
+| [treaty-utilities/setup-tests.ts](../treaty-utilities/setup-tests.ts) | Bun test environment bootstrap |
+| [bunfig.toml](../bunfig.toml) | Bun preload and test configuration |
