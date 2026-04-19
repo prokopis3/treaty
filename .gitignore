@@ -46,9 +46,10 @@ Thumbs.db
 .env
 .env.production
 .wrangler/
-src/tailwind.generated.css
+/src/*.generated.css
 server.bundle.js
 .env.dev
 .env.keys
 .dev.vars*
 .docker/secrets/
+*.bun-build
