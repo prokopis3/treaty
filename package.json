@@ -40,9 +40,10 @@
     "cf:secrets:sync": "bun run env:prod:key:require && bun run env:prod:ensure && bunx dotenvx run -f .env.production -- bun --no-env-file backend/scripts/sync-cloudflare-secrets.ts",
     "cf:dev": "wrangler dev",
     "cf:deploy": "bun run cf:prepare && bunx wrangler deploy",
+    "docker:prod:up": "bun run env:prod:encrypt && bun run env:prod:secret:prepare && bunx dotenvx run -f .env.production -- docker compose -f docker-compose.prod.yml up -d --build",
     "docker:prod:up:bin": "bun run env:prod:encrypt && bun run env:prod:secret:prepare && bunx dotenvx run -f .env.production -- docker compose -f docker-compose.prod.yml -f docker-compose.prod.bin.yml up -d --build",
     "docker:prod:down": "bun run env:prod:ensure && bunx dotenvx run -f .env.production -- docker compose -f docker-compose.prod.yml down && bun run env:prod:secret:cleanup",
-    "deploy:option-a": "bun run docker:prod:up:bin && bun run cf:deploy",
+    "deploy:option-a": "bun run docker:prod:up && bun run cf:deploy",
     "prod": "bunx dotenvx run -f .env.production -- bun run build && bunx dotenvx run -f .env.production -- bun run server:prod",
     "prod:bin": "bunx dotenvx run -f .env.production -- bun run build && bunx dotenvx run -f .env.production -- bun run build:runtime:bin:local && bunx dotenvx run -f .env.production -- bun run server:prod:bin",
     "prod:bundle": "bunx dotenvx run -f .env.production -- bun run build && bunx dotenvx run -f .env.production -- bun run build:runtime:bundle && bunx dotenvx run -f .env.production -- bun run server:prod:bundle"
