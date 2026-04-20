@@ -95,7 +95,9 @@ if (!disableDatabase) {
   const db = await createSurrealClient();
   await ensureSurrealSchema(db);
   const postRepository = new SurrealPostRepository(db);
-  const postService = new PostService(postRepository);
+  const postService = new PostService(postRepository, {
+    countCacheTtlMs: env.API_POSTS_COUNT_CACHE_TTL_MS,
+  });
   surrealPageCacheRepository = new SurrealPageCacheRepository(db);
   await seedPosts(postRepository);
   postsApi = createPostsApi(postService);

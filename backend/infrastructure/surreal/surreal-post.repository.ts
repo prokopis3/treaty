@@ -1,25 +1,61 @@
 import { RecordId, Surreal, Table } from 'surrealdb';
-import { CreatePostInput, Post } from '../../domain/post';
+import {
+  CreatePostInput,
+  Post,
+  PostListQuery,
+  UpdatePostInput,
+} from '../../domain/post';
 import { PostRepository } from '../../domain/post.repository';
 import { normalizePostRecord, pickSingleRecord } from './surreal-record.util';
+
+type LegacyQueryStatement<T> = {
+  result?: T[];
+};
+
+function extractQueryRows<T>(queryResult: unknown, statementIndex: number = 0): T[] {
+  if (!Array.isArray(queryResult)) {
+    return [];
+  }
+
+  const statement = queryResult[statementIndex];
+  if (Array.isArray(statement)) {
+    return statement as T[];
+  }
+
+  if (statement && typeof statement === 'object') {
+    const maybeLegacy = statement as LegacyQueryStatement<T>;
+    if (Array.isArray(maybeLegacy.result)) {
+      return maybeLegacy.result;
+    }
+  }
+
+  return [];
+}
 
 export class SurrealPostRepository implements PostRepository {
   constructor(private readonly db: Surreal) {}
 
-  async list(): Promise<Post[]> {
-    const records = (await this.db.select(new Table('post'))) as
-      | unknown[]
-      | unknown;
-    const list = Array.isArray(records) ? records : records ? [records] : [];
+  async list(query: PostListQuery): Promise<Post[]> {
+    const queryResult = await this.db.query(
+      'SELECT * FROM post ORDER BY createdAt DESC LIMIT $limit START $offset;',
+      {
+        limit: query.limit,
+        offset: query.offset,
+      }
+    );
 
-    return list
-      .map((record) => normalizePostRecord(record))
-      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    const list = extractQueryRows<unknown>(queryResult);
+
+    return list.map((record) => normalizePostRecord(record));
   }
 
   async getById(id: string): Promise<Post | null> {
     const post = await this.db.select(new RecordId('post', id));
     const normalized = pickSingleRecord(post);
+
+    if (typeof normalized === 'string') {
+      return null;
+    }
 
     return normalized ? normalizePostRecord(normalized) : null;
   }
@@ -42,13 +78,41 @@ export class SurrealPostRepository implements PostRepository {
     return normalizePostRecord(pickSingleRecord(created));
   }
 
+  async update(id: string, input: UpdatePostInput): Promise<Post | null> {
+    const recordId = new RecordId('post', id);
+    const existing = await this.db.select(recordId);
+
+    if (!pickSingleRecord(existing)) {
+      return null;
+    }
+
+    const patch: Record<string, string> = {};
+
+    if (typeof input.title === 'string') {
+      patch['title'] = input.title;
+    }
+
+    if (typeof input.content === 'string') {
+      patch['content'] = input.content;
+    }
+
+    if (typeof input.source === 'string') {
+      patch['source'] = input.source;
+    }
+
+    const updated = await this.db.update(recordId).merge(patch);
+    const normalized = pickSingleRecord(updated);
+
+    return normalized ? normalizePostRecord(normalized) : null;
+  }
+
   async count(): Promise<number> {
     const queryResult = await this.db.query(
       'SELECT count() AS total FROM post GROUP ALL;'
     );
 
-    const statements = queryResult as Array<{ result?: Array<{ total?: number }> }>;
-    const total = statements?.[0]?.result?.[0]?.total;
+    const firstRow = extractQueryRows<{ total?: number }>(queryResult)[0];
+    const total = firstRow?.total;
 
     return typeof total === 'number' ? total : 0;
   }

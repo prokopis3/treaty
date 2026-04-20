@@ -13,8 +13,23 @@ export type CreatePostInput = {
   source?: string;
 };
 
+export type UpdatePostInput = {
+  title?: string;
+  content?: string;
+  source?: string;
+};
+
 export type PostListMeta = {
   total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+};
+
+export type PostListQuery = {
+  limit: number;
+  offset: number;
+  page: number;
 };
 
 export type AuthContext = {

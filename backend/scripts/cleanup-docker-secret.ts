@@ -1,7 +1,7 @@
 import { existsSync, rmSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-const OUTPUT_PATH = process.env.DOTENV_PRIVATE_KEY_FILE || '.docker/secrets/dotenv_private_key_production'
+const OUTPUT_PATH = process.env['DOTENV_PRIVATE_KEY_FILE'] || '.docker/secrets/dotenv_private_key_production'
 const outputPath = resolve(OUTPUT_PATH)
 
 if (existsSync(outputPath)) {
